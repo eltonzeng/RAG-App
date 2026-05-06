@@ -1,0 +1,37 @@
+# Core framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0
+pydantic-settings>=2.0
+python-dotenv>=1.0.0
+
+# RAG pipeline
+langchain>=0.2.0
+langchain-community>=0.2.0
+langchain-text-splitters>=0.2.0
+
+# Embeddings & LLM
+openai>=1.30.0
+anthropic>=0.30.0
+
+# Reranking
+cohere>=5.0
+
+# Vector store
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+pgvector>=0.3.0
+
+# Document processing
+pypdf>=4.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+tiktoken>=0.7.0
+
+# UI
+streamlit>=1.35.0
+
+# Testing
+pytest>=8.0
+pytest-asyncio>=0.23.0
+httpx>=0.27.0
