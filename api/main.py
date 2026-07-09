@@ -40,15 +40,24 @@ def _get_database_url() -> str:
     return url
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage asyncpg pool lifecycle tied to FastAPI app startup/shutdown.
+async def create_pool(
+    min_size: int = 2,
+    max_size: int = 10,
+    command_timeout: float = 30,
+) -> asyncpg.Pool:
+    """Create an asyncpg pool with the pgvector codec registered.
+
+    Loads DATABASE_URL from the environment and normalizes the scheme. Shared by
+    the FastAPI lifespan and offline tooling (e.g. the eval harness) so both talk
+    to the database the same way.
 
     Args:
-        app: The FastAPI application instance.
+        min_size: Minimum number of connections in the pool.
+        max_size: Maximum number of connections in the pool.
+        command_timeout: Per-command timeout in seconds.
 
-    Yields:
-        Control to the application while the pool is active.
+    Returns:
+        An initialized asyncpg connection pool.
     """
     from dotenv import load_dotenv
     load_dotenv()
@@ -62,13 +71,27 @@ async def lifespan(app: FastAPI):
     logger.info("Creating database connection pool")
     pool = await asyncpg.create_pool(
         dsn=db_url,
-        min_size=2,
-        max_size=10,
-        command_timeout=30,
+        min_size=min_size,
+        max_size=max_size,
+        command_timeout=command_timeout,
         init=_init_connection,
     )
-    app.state.pool = pool
     logger.info("Database pool created successfully")
+    return pool
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage asyncpg pool lifecycle tied to FastAPI app startup/shutdown.
+
+    Args:
+        app: The FastAPI application instance.
+
+    Yields:
+        Control to the application while the pool is active.
+    """
+    pool = await create_pool()
+    app.state.pool = pool
 
     yield
 

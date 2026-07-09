@@ -1,0 +1,15 @@
+{"id": "q1", "question": "What was the company's total revenue for the most recent fiscal year?", "filters": {"form_type": "10-K"}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q2", "question": "What are the primary risk factors disclosed in the filing?", "filters": {"form_type": "10-K"}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q3", "question": "How much did the company spend on research and development?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q4", "question": "What was the operating income or loss for the period?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q5", "question": "Describe the company's reportable business segments and their revenue.", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q6", "question": "What are the terms of the company's long-term debt obligations?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q7", "question": "What legal proceedings is the company currently involved in?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q8", "question": "What is discussed in Management's Discussion and Analysis about liquidity?", "filters": {"form_type": "10-K"}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q9", "question": "How many shares of common stock were outstanding at fiscal year end?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q10", "question": "What were the total assets and total liabilities on the balance sheet?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q11", "question": "What dividends, if any, did the company declare during the year?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q12", "question": "What are the company's critical accounting estimates?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q13", "question": "What cybersecurity risks and governance does the company describe?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q14", "question": "What was the net cash provided by operating activities?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
+{"id": "q15", "question": "Who are the company's named executive officers and directors?", "filters": {}, "gold": [{"source_filename": "REPLACE_WITH_YOUR_FILING.pdf", "page_number": 0}]}
