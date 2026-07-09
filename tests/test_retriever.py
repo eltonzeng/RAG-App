@@ -3,6 +3,7 @@
 Uses mocks to avoid requiring live database or API connections.
 """
 
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -13,6 +14,7 @@ from retrieval.reranker import (
     RELEVANCE_THRESHOLD,
     rerank,
 )
+from retrieval.retriever import _row_to_scored_chunk, _rrf_fuse
 
 
 def make_scored_chunk(chunk_id: str, content: str, score: float) -> ScoredChunk:
@@ -140,3 +142,69 @@ class TestReranker:
             reranked, is_relevant = await rerank("unrelated query", chunks, top_n=1)
 
         assert is_relevant is False
+
+
+def _row(chunk_id: str, similarity: float, sources: list[dict]) -> dict:
+    """Build a fake DB row (asyncpg Record is dict-accessible in these tests)."""
+    return {
+        "id": chunk_id,
+        "content": f"content for {chunk_id}",
+        "sources": json.dumps(sources),
+        "similarity": similarity,
+    }
+
+
+class TestRowConversion:
+    """Tests for _row_to_scored_chunk."""
+
+    def test_carries_sources_and_derives_first_source(self) -> None:
+        sources = [
+            {"source_filename": "aapl_10k.pdf", "page_number": 5, "chunk_index": 2},
+            {"source_filename": "aapl_10q.pdf", "page_number": 1},
+        ]
+        sc = _row_to_scored_chunk(_row("c1", 0.83, sources))
+
+        assert sc.chunk.id == "c1"
+        assert sc.score == 0.83
+        assert sc.chunk.metadata["sources"] == sources
+        # Back-compat fields derive from the first source.
+        assert sc.chunk.metadata["source_filename"] == "aapl_10k.pdf"
+        assert sc.chunk.metadata["page_number"] == 5
+        assert sc.chunk.chunk_index == 2
+
+    def test_handles_empty_sources(self) -> None:
+        sc = _row_to_scored_chunk(_row("c2", 0.5, []))
+        assert sc.chunk.metadata["source_filename"] == "unknown"
+        assert sc.chunk.metadata["page_number"] is None
+
+
+class TestRRFFusion:
+    """Tests for _rrf_fuse."""
+
+    def _chunk_map(self, ids_scores: dict[str, float]) -> dict[str, ScoredChunk]:
+        return {cid: make_scored_chunk(cid, cid, score) for cid, score in ids_scores.items()}
+
+    def test_consensus_across_lists_ranks_first(self) -> None:
+        """A chunk ranked highly in both lists beats list-specific top hits."""
+        chunk_map = self._chunk_map({"a": 0.9, "b": 0.8, "c": 0.7, "d": 0.6})
+        semantic = ["a", "b", "c"]
+        bm25 = ["b", "d", "a"]
+
+        fused = _rrf_fuse([semantic, bm25], chunk_map, top_k=4)
+        # 'b' is rank1+rank0, 'a' is rank0+rank2 — 'b' should edge ahead overall.
+        assert fused[0].chunk.id == "b"
+        assert {sc.chunk.id for sc in fused} == {"a", "b", "c", "d"}
+
+    def test_respects_top_k(self) -> None:
+        chunk_map = self._chunk_map({"a": 0.9, "b": 0.8, "c": 0.7})
+        fused = _rrf_fuse([["a", "b", "c"]], chunk_map, top_k=2)
+        assert len(fused) == 2
+
+    def test_preserves_cosine_score(self) -> None:
+        """Fused chunks keep their cosine similarity as score (for reranking)."""
+        chunk_map = self._chunk_map({"a": 0.42})
+        fused = _rrf_fuse([["a"]], chunk_map, top_k=1)
+        assert fused[0].score == 0.42
+
+    def test_empty_lists_return_empty(self) -> None:
+        assert _rrf_fuse([], {}, top_k=5) == []

@@ -31,6 +31,9 @@ class Chunk(BaseModel):
         chunk_index: Position of this chunk within its source document.
         char_count: Number of characters in the chunk content.
         metadata: Inherited and augmented metadata from the source document.
+            After retrieval, ``metadata["sources"]`` holds the list of
+            provenance objects (source_filename, page_number, and any extracted
+            ticker/fiscal_year/quarter/form_type) for this deduplicated chunk.
     """
 
     id: str
@@ -66,6 +69,51 @@ class Citation(BaseModel):
     chunk_id: str
 
 
+# --- Query understanding models ---
+
+
+class MetadataFilters(BaseModel):
+    """Structured filters extracted from a user query by the rewrite step.
+
+    All fields are optional; only the ones the model could confidently extract
+    are set. They are matched against the per-chunk ``sources`` JSONB array via
+    containment (``@>``) at retrieval time.
+
+    Attributes:
+        ticker: Stock ticker symbol (e.g. "AAPL"), uppercased.
+        fiscal_year: Four-digit fiscal year (e.g. 2023).
+        quarter: Fiscal quarter 1-4 (None for annual/10-K filings).
+        form_type: SEC form type (e.g. "10-K", "10-Q").
+    """
+
+    ticker: str | None = None
+    fiscal_year: int | None = None
+    quarter: int | None = None
+    form_type: str | None = None
+
+    def as_containment(self) -> dict:
+        """Return the non-null filters as a plain dict for JSONB containment.
+
+        Returns:
+            Dict of set filter keys → values, suitable for wrapping in a
+            single-element JSON array and passing to ``sources @> $1``. Empty
+            when no filters were extracted.
+        """
+        return {k: v for k, v in self.model_dump().items() if v is not None}
+
+
+class QueryRewriteResult(BaseModel):
+    """Output of the single Haiku query-rewrite call.
+
+    Attributes:
+        queries: 1-4 reformulated search queries for multi-query retrieval.
+        filters: Structured metadata filters parsed from the user's question.
+    """
+
+    queries: list[str]
+    filters: MetadataFilters = Field(default_factory=MetadataFilters)
+
+
 # --- API request/response models ---
 
 
@@ -92,6 +140,9 @@ class AskResponse(BaseModel):
         latency_ms: Total pipeline latency in milliseconds.
         chunks_retrieved: Number of chunks retrieved before reranking.
         chunks_used: Number of chunks passed to the generator.
+        rewritten_queries: Query variants the rewrite step produced (for
+            transparency/debugging).
+        applied_filters: Metadata filters extracted and applied during retrieval.
     """
 
     answer: str
@@ -99,6 +150,8 @@ class AskResponse(BaseModel):
     latency_ms: float
     chunks_retrieved: int
     chunks_used: int
+    rewritten_queries: list[str] = Field(default_factory=list)
+    applied_filters: MetadataFilters = Field(default_factory=MetadataFilters)
 
 
 class IngestRequest(BaseModel):
@@ -124,12 +177,15 @@ class IngestResponse(BaseModel):
     Attributes:
         documents_loaded: Number of source documents loaded.
         chunks_created: Number of chunks generated.
-        chunks_embedded: Number of chunks embedded and stored.
+        chunks_embedded: Number of new chunks embedded and stored.
+        chunks_skipped: Number of chunks skipped as duplicates (content already
+            stored); their new provenance was appended without re-embedding.
     """
 
     documents_loaded: int
     chunks_created: int
     chunks_embedded: int
+    chunks_skipped: int = 0
 
 
 class HealthResponse(BaseModel):

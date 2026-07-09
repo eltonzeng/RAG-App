@@ -20,11 +20,13 @@ from api.models import (
     IngestResponse,
 )
 from generation.generator import GENERATION_MODEL, generate
+from generation.query_rewriter import rewrite_query
 from ingest.chunker import chunk_fixed, chunk_recursive, chunk_sentence
 from ingest.embedder import EMBEDDING_MODEL, embed_and_store
 from ingest.loader import load_pdf, load_txt, load_urls
+from ingest.metadata import extract_filing_metadata
 from retrieval.reranker import rerank
-from retrieval.retriever import retrieve
+from retrieval.retriever import hybrid_retrieve
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -121,6 +123,11 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
     if not documents:
         raise HTTPException(status_code=400, detail="No content could be loaded from provided sources")
 
+    # Extract best-effort filing metadata (ticker/year/quarter/form_type) per
+    # document so chunks inherit it for query-time filtering.
+    for document in documents:
+        document.metadata.update(extract_filing_metadata(document))
+
     # Chunk
     try:
         chunks = strategy_fn(documents)
@@ -128,10 +135,10 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
         logger.error("Chunking failed: %s", e)
         raise HTTPException(status_code=500, detail="Chunking failed")
 
-    # Embed and store
+    # Embed and store (deduping by content hash)
     try:
         pool = request.app.state.pool
-        stored = await embed_and_store(chunks, pool)
+        embedded, skipped = await embed_and_store(chunks, pool)
     except Exception as e:
         logger.error("Embedding/storage failed: %s", e)
         raise HTTPException(status_code=500, detail="Embedding or database storage failed")
@@ -139,7 +146,8 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
     return IngestResponse(
         documents_loaded=len(documents),
         chunks_created=len(chunks),
-        chunks_embedded=stored,
+        chunks_embedded=embedded,
+        chunks_skipped=skipped,
     )
 
 
@@ -160,16 +168,23 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
     start_time = time.perf_counter()
     pool = request.app.state.pool
 
-    # Retrieve
+    # Rewrite: expand into query variants + extract metadata filters. Degrades
+    # gracefully to the original query on failure (never raises).
+    rewrite = await rewrite_query(body.query)
+    filters = rewrite.filters.as_containment()
+
+    # Retrieve (hybrid semantic + BM25, multi-query RRF, metadata-filtered)
     try:
-        scored_chunks = await retrieve(body.query, pool, top_k=body.top_k)
+        scored_chunks = await hybrid_retrieve(
+            rewrite.queries, filters, pool, top_k=body.top_k
+        )
     except Exception as e:
         logger.error("Retrieval failed for query '%s': %s", body.query, e)
         raise HTTPException(status_code=503, detail="Retrieval service unavailable")
 
     chunks_retrieved = len(scored_chunks)
 
-    # Rerank
+    # Rerank on the original query (its true intent) rather than a variant.
     try:
         reranked, is_relevant = await rerank(body.query, scored_chunks, top_n=body.top_n)
     except Exception as e:
@@ -197,4 +212,6 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
         latency_ms=round(latency_ms, 1),
         chunks_retrieved=chunks_retrieved,
         chunks_used=chunks_used,
+        rewritten_queries=rewrite.queries,
+        applied_filters=rewrite.filters,
     )

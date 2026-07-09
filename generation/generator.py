@@ -38,17 +38,21 @@ def _extract_citations(scored_chunks: list[ScoredChunk]) -> list[Citation]:
 
     for sc in scored_chunks:
         chunk = sc.chunk
-        source = chunk.metadata.get("source_filename", "Unknown")
-        page = chunk.metadata.get("page_number")
-        key = f"{source}:{page}"
+        # A deduplicated chunk may appear in several filings; emit one citation
+        # per distinct (source, page). Fall back to top-level metadata if the
+        # sources array is absent (e.g. legacy/mocked chunks).
+        sources = chunk.metadata.get("sources") or [{
+            "source_filename": chunk.metadata.get("source_filename", "Unknown"),
+            "page_number": chunk.metadata.get("page_number"),
+        }]
 
-        if key not in seen:
-            seen.add(key)
-            citations.append(Citation(
-                source=source,
-                page=page,
-                chunk_id=chunk.id,
-            ))
+        for src in sources:
+            source = src.get("source_filename", "Unknown")
+            page = src.get("page_number")
+            key = f"{source}:{page}"
+            if key not in seen:
+                seen.add(key)
+                citations.append(Citation(source=source, page=page, chunk_id=chunk.id))
 
     return citations
 

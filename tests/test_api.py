@@ -11,7 +11,14 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 from api.main import app
-from api.models import Chunk, Citation, ScoredChunk
+from api.models import Chunk, Citation, MetadataFilters, QueryRewriteResult, ScoredChunk
+
+
+def _rewrite(query: str = "q", **filters) -> QueryRewriteResult:
+    """Build a QueryRewriteResult for patching api.routes.rewrite_query."""
+    return QueryRewriteResult(
+        queries=[query], filters=MetadataFilters(**filters)
+    )
 
 
 @pytest.fixture
@@ -128,7 +135,7 @@ class TestIngestEndpoint:
                 )
             ]
             mock_chunk.return_value = [sample_scored_chunk.chunk]
-            mock_embed.return_value = 1
+            mock_embed.return_value = (1, 0)  # (embedded, skipped)
 
             response = await async_client.post(
                 "/ingest",
@@ -140,6 +147,7 @@ class TestIngestEndpoint:
         assert data["documents_loaded"] == 1
         assert data["chunks_created"] == 1
         assert data["chunks_embedded"] == 1
+        assert data["chunks_skipped"] == 0
 
 
 class TestAskEndpoint:
@@ -151,10 +159,14 @@ class TestAskEndpoint:
     ) -> None:
         """Successful ask should return answer with citations."""
         with (
-            patch("api.routes.retrieve", new_callable=AsyncMock) as mock_retrieve,
+            patch("api.routes.rewrite_query", new_callable=AsyncMock) as mock_rewrite,
+            patch("api.routes.hybrid_retrieve", new_callable=AsyncMock) as mock_retrieve,
             patch("api.routes.rerank", new_callable=AsyncMock) as mock_rerank,
             patch("api.routes.generate", new_callable=AsyncMock) as mock_generate,
         ):
+            mock_rewrite.return_value = _rewrite(
+                "What was Apple's revenue?", ticker="AAPL", fiscal_year=2023
+            )
             mock_retrieve.return_value = [sample_scored_chunk]
             mock_rerank.return_value = ([sample_scored_chunk], True)
             mock_generate.return_value = (
@@ -174,7 +186,14 @@ class TestAskEndpoint:
         assert data["citations"][0]["source"] == "apple_10k.pdf"
         assert data["chunks_retrieved"] == 1
         assert data["chunks_used"] == 1
-        assert data["latency_ms"] > 0
+        # Latency is measured and non-negative. (A fully-mocked pipeline can run
+        # in well under 0.05ms, which rounds to 0.0 — so assert >= 0, not > 0.)
+        assert data["latency_ms"] >= 0
+        assert data["rewritten_queries"] == ["What was Apple's revenue?"]
+        assert data["applied_filters"]["ticker"] == "AAPL"
+        # Retrieval should receive the extracted filters.
+        _, called_filters, *_ = mock_retrieve.call_args.args
+        assert called_filters == {"ticker": "AAPL", "fiscal_year": 2023}
 
     @pytest.mark.asyncio
     async def test_ask_no_relevant_content(self, async_client: AsyncClient) -> None:
@@ -182,10 +201,12 @@ class TestAskEndpoint:
         from generation.prompts import NO_RELEVANT_CONTENT_RESPONSE
 
         with (
-            patch("api.routes.retrieve", new_callable=AsyncMock) as mock_retrieve,
+            patch("api.routes.rewrite_query", new_callable=AsyncMock) as mock_rewrite,
+            patch("api.routes.hybrid_retrieve", new_callable=AsyncMock) as mock_retrieve,
             patch("api.routes.rerank", new_callable=AsyncMock) as mock_rerank,
             patch("api.routes.generate", new_callable=AsyncMock) as mock_generate,
         ):
+            mock_rewrite.return_value = _rewrite("Completely unrelated question")
             mock_retrieve.return_value = []
             mock_rerank.return_value = ([], False)
             mock_generate.return_value = (NO_RELEVANT_CONTENT_RESPONSE, [])
@@ -202,7 +223,11 @@ class TestAskEndpoint:
     @pytest.mark.asyncio
     async def test_ask_retrieval_failure_returns_503(self, async_client: AsyncClient) -> None:
         """If retrieval fails, /ask should return 503."""
-        with patch("api.routes.retrieve", new_callable=AsyncMock) as mock_retrieve:
+        with (
+            patch("api.routes.rewrite_query", new_callable=AsyncMock) as mock_rewrite,
+            patch("api.routes.hybrid_retrieve", new_callable=AsyncMock) as mock_retrieve,
+        ):
+            mock_rewrite.return_value = _rewrite("What is the revenue?")
             mock_retrieve.side_effect = Exception("DB unavailable")
             response = await async_client.post(
                 "/ask",
