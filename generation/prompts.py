@@ -49,15 +49,91 @@ def build_context_block(chunks: list) -> str:
         chunks: List of ScoredChunk objects to format.
 
     Returns:
-        Formatted string with numbered excerpts and source citations.
+        Formatted string with numbered excerpts and source citations. When a
+        deduplicated chunk appears in multiple filings, all of its sources are
+        listed.
     """
     parts: list[str] = []
     for i, scored_chunk in enumerate(chunks, start=1):
         chunk = scored_chunk.chunk
-        source = chunk.metadata.get("source_filename", "Unknown source")
-        page = chunk.metadata.get("page_number")
-        page_str = f", page {page}" if page else ""
-        parts.append(
-            f"[Excerpt {i} — {source}{page_str}]\n{chunk.content}"
-        )
+        sources = chunk.metadata.get("sources")
+        if sources:
+            labels = []
+            for src in sources:
+                name = src.get("source_filename", "Unknown source")
+                page = src.get("page_number")
+                labels.append(f"{name}, page {page}" if page else name)
+            source_label = "; ".join(labels)
+        else:
+            source = chunk.metadata.get("source_filename", "Unknown source")
+            page = chunk.metadata.get("page_number")
+            source_label = f"{source}, page {page}" if page else source
+        parts.append(f"[Excerpt {i} — {source_label}]\n{chunk.content}")
     return "\n\n".join(parts)
+
+
+# --- Query rewriting (Haiku) ---
+
+QUERY_REWRITE_SYSTEM_PROMPT = """You are a query-understanding component for a \
+retrieval system over SEC filings (10-K, 10-Q, and related EDGAR documents).
+
+Given a user's question, produce a search plan by calling the `search_plan` tool. \
+Your job is twofold:
+
+1. Rewrite the question into 3-4 diverse search queries that improve retrieval \
+recall. Vary the phrasing: include a keyword-dense variant (financial terms, GAAP \
+line items), a natural-language variant, and a variant using synonyms or expanded \
+acronyms. Keep each query focused on the same underlying intent — do not invent new \
+questions.
+
+2. Extract any structured metadata the user explicitly or implicitly specified: \
+company stock ticker, fiscal year, fiscal quarter, and SEC form type. Only include \
+a field when you are confident it is present in the question. Leave a field null \
+otherwise. Never guess a ticker from a company name unless it is unambiguous \
+(e.g. "Apple" → "AAPL").
+
+Always call the tool exactly once."""
+
+# Anthropic tool schema forcing structured JSON output from the rewrite call.
+QUERY_REWRITE_TOOL = {
+    "name": "search_plan",
+    "description": (
+        "Return the rewritten search queries and any extracted metadata filters "
+        "for retrieving relevant SEC filing chunks."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "queries": {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+                "maxItems": 4,
+                "description": "3-4 reformulated search queries for the same intent.",
+            },
+            "filters": {
+                "type": "object",
+                "properties": {
+                    "ticker": {
+                        "type": ["string", "null"],
+                        "description": "Uppercase stock ticker, e.g. AAPL.",
+                    },
+                    "fiscal_year": {
+                        "type": ["integer", "null"],
+                        "description": "Four-digit fiscal year, e.g. 2023.",
+                    },
+                    "quarter": {
+                        "type": ["integer", "null"],
+                        "description": "Fiscal quarter 1-4, or null for annual filings.",
+                    },
+                    "form_type": {
+                        "type": ["string", "null"],
+                        "description": "SEC form type, e.g. 10-K or 10-Q.",
+                    },
+                },
+                "required": ["ticker", "fiscal_year", "quarter", "form_type"],
+            },
+        },
+        "required": ["queries", "filters"],
+    },
+}

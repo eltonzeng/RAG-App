@@ -1,9 +1,17 @@
-"""Vector similarity retrieval from pgvector.
+"""Hybrid retrieval from ParadeDB (pgvector + pg_search).
 
-Embeds the query using OpenAI text-embedding-3-small and performs
-cosine similarity search against the chunks table.
+Runs, for each rewritten query variant, a semantic branch (pgvector cosine
+similarity) and a lexical branch (ParadeDB BM25), optionally constrained by
+JSONB metadata filters. All ranked lists are fused with Reciprocal Rank Fusion
+(RRF) into a single ordering.
+
+Each returned ScoredChunk carries the chunk's best cosine similarity as its
+``score`` (so the reranker's cosine-calibrated fallback threshold stays valid);
+the RRF score only determines ordering, not the stored score.
 """
 
+import asyncio
+import json
 import logging
 import time
 
@@ -15,85 +23,213 @@ from api.models import Chunk, ScoredChunk
 logger = logging.getLogger(__name__)
 
 EMBEDDING_MODEL = "text-embedding-3-small"
+RRF_K = 60  # RRF damping constant; standard default.
+# Per-branch candidate pool. Widened beyond top_k so fusion has material to work
+# with before the final trim.
+BRANCH_LIMIT_MULTIPLIER = 2
 
 
-async def retrieve(
+def _row_to_scored_chunk(row: asyncpg.Record) -> ScoredChunk:
+    """Convert a DB row into a ScoredChunk carrying its sources provenance.
+
+    Args:
+        row: A row with id, content, sources (JSONB text), and similarity.
+
+    Returns:
+        ScoredChunk whose metadata holds the full ``sources`` list plus the
+        first source's filename/page for back-compatible citation code.
+    """
+    sources = row["sources"]
+    if isinstance(sources, str):
+        sources = json.loads(sources)
+    first = sources[0] if sources else {}
+    chunk = Chunk(
+        id=row["id"],
+        content=row["content"],
+        chunk_index=first.get("chunk_index", 0),
+        char_count=len(row["content"]),
+        metadata={
+            "sources": sources,
+            "source_filename": first.get("source_filename", "unknown"),
+            "page_number": first.get("page_number"),
+        },
+    )
+    return ScoredChunk(chunk=chunk, score=float(row["similarity"]))
+
+
+async def _search_semantic(
+    conn: asyncpg.Connection,
+    embedding: list[float],
+    filter_json: str | None,
+    limit: int,
+) -> list[asyncpg.Record]:
+    """Cosine-similarity search, optionally filtered by JSONB containment."""
+    if filter_json is None:
+        return await conn.fetch(
+            """
+            SELECT id::text, content, sources,
+                   1 - (embedding <=> $1::vector) AS similarity
+            FROM chunks
+            ORDER BY embedding <=> $1::vector
+            LIMIT $2
+            """,
+            embedding, limit,
+        )
+    return await conn.fetch(
+        """
+        SELECT id::text, content, sources,
+               1 - (embedding <=> $1::vector) AS similarity
+        FROM chunks
+        WHERE sources @> $2::jsonb
+        ORDER BY embedding <=> $1::vector
+        LIMIT $3
+        """,
+        embedding, filter_json, limit,
+    )
+
+
+async def _search_bm25(
+    conn: asyncpg.Connection,
     query: str,
+    embedding: list[float],
+    filter_json: str | None,
+    limit: int,
+) -> list[asyncpg.Record]:
+    """BM25 lexical search via ParadeDB, optionally filtered by JSONB containment.
+
+    Cosine similarity is computed alongside so BM25-only hits still carry a
+    similarity score for downstream reranking.
+    """
+    if filter_json is None:
+        return await conn.fetch(
+            """
+            SELECT id::text, content, sources,
+                   1 - (embedding <=> $2::vector) AS similarity
+            FROM chunks
+            WHERE id @@@ paradedb.match('content', $1)
+            ORDER BY paradedb.score(id) DESC
+            LIMIT $3
+            """,
+            query, embedding, limit,
+        )
+    return await conn.fetch(
+        """
+        SELECT id::text, content, sources,
+               1 - (embedding <=> $2::vector) AS similarity
+        FROM chunks
+        WHERE id @@@ paradedb.match('content', $1)
+          AND sources @> $3::jsonb
+        ORDER BY paradedb.score(id) DESC
+        LIMIT $4
+        """,
+        query, embedding, filter_json, limit,
+    )
+
+
+def _rrf_fuse(
+    ranked_lists: list[list[str]],
+    chunk_map: dict[str, ScoredChunk],
+    top_k: int,
+) -> list[ScoredChunk]:
+    """Fuse multiple ranked ID lists via Reciprocal Rank Fusion.
+
+    Args:
+        ranked_lists: Each inner list is chunk IDs ordered best-first for one
+            branch/variant.
+        chunk_map: Maps chunk ID → ScoredChunk (score = best cosine similarity).
+        top_k: Maximum number of fused results to return.
+
+    Returns:
+        Up to top_k ScoredChunks ordered by descending RRF score. Each retains
+        its cosine-similarity score for reranking.
+    """
+    rrf_scores: dict[str, float] = {}
+    for ranked in ranked_lists:
+        for rank, chunk_id in enumerate(ranked):
+            rrf_scores[chunk_id] = rrf_scores.get(chunk_id, 0.0) + 1.0 / (RRF_K + rank + 1)
+
+    ordered_ids = sorted(rrf_scores, key=lambda cid: rrf_scores[cid], reverse=True)
+    return [chunk_map[cid] for cid in ordered_ids[:top_k]]
+
+
+async def hybrid_retrieve(
+    queries: list[str],
+    filters: dict,
     db_pool: asyncpg.Pool,
     top_k: int = 20,
 ) -> list[ScoredChunk]:
-    """Embed a query and retrieve the most similar chunks via cosine similarity.
+    """Hybrid (semantic + BM25) multi-query retrieval with RRF fusion.
 
     Args:
-        query: The user's natural language question.
-        db_pool: asyncpg connection pool to the PostgreSQL database.
-        top_k: Number of top results to return.
+        queries: One or more query variants (from the rewrite step). Each is run
+            through both a semantic and a BM25 branch.
+        filters: Metadata filters (e.g. {"ticker": "AAPL", "fiscal_year": 2023}).
+            Applied as JSONB containment against each chunk's sources array.
+            Empty dict means no filtering.
+        db_pool: asyncpg connection pool.
+        top_k: Number of fused chunks to return.
 
     Returns:
-        List of ScoredChunk objects sorted by descending similarity score.
+        Up to top_k ScoredChunk objects ordered by RRF score, each carrying its
+        best cosine similarity as ``score``.
 
     Raises:
-        Exception: If embedding or database query fails.
+        Exception: If embedding or the database queries fail.
     """
+    if not queries:
+        logger.warning("hybrid_retrieve called with no queries")
+        return []
+
     start_time = time.perf_counter()
+    filter_json = json.dumps([filters]) if filters else None
+
+    # Embed every query variant in a single OpenAI call.
     client = AsyncOpenAI()
-
     try:
-        response = await client.embeddings.create(
-            model=EMBEDDING_MODEL,
-            input=[query],
-        )
-        query_embedding = response.data[0].embedding
+        response = await client.embeddings.create(model=EMBEDDING_MODEL, input=queries)
+        embeddings = [item.embedding for item in response.data]
     except Exception as e:
-        logger.error("Failed to embed query: %s", e)
+        logger.error("Failed to embed query variants: %s", e)
         raise
 
-    embed_time = time.perf_counter()
-    logger.debug("Query embedded in %.3fs", embed_time - start_time)
+    branch_limit = max(top_k * BRANCH_LIMIT_MULTIPLIER, top_k)
 
-    try:
+    async def _run_variant(query: str, embedding: list[float]) -> list[list[asyncpg.Record]]:
         async with db_pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT
-                    id::text,
-                    source_filename,
-                    page_number,
-                    line_range,
-                    chunk_index,
-                    char_count,
-                    content,
-                    1 - (embedding <=> $1::vector) AS similarity
-                FROM chunks
-                ORDER BY embedding <=> $1::vector
-                LIMIT $2
-                """,
-                query_embedding,
-                top_k,
-            )
+            semantic = await _search_semantic(conn, embedding, filter_json, branch_limit)
+            bm25 = await _search_bm25(conn, query, embedding, filter_json, branch_limit)
+        return [semantic, bm25]
+
+    try:
+        per_variant = await asyncio.gather(
+            *(_run_variant(q, emb) for q, emb in zip(queries, embeddings))
+        )
     except Exception as e:
-        logger.error("Database similarity search failed: %s", e)
+        logger.error("Hybrid retrieval database queries failed: %s", e)
         raise
 
-    results: list[ScoredChunk] = []
-    for row in rows:
-        chunk = Chunk(
-            id=row["id"],
-            content=row["content"],
-            chunk_index=row["chunk_index"],
-            char_count=row["char_count"],
-            metadata={
-                "source_filename": row["source_filename"],
-                "page_number": row["page_number"],
-                "line_range": row["line_range"],
-            },
-        )
-        results.append(ScoredChunk(chunk=chunk, score=float(row["similarity"])))
+    # Collect every branch's ranked ID list and a unified chunk map (keeping the
+    # highest cosine similarity seen for each chunk).
+    chunk_map: dict[str, ScoredChunk] = {}
+    ranked_lists: list[list[str]] = []
+    for branches in per_variant:
+        for rows in branches:
+            ranked_ids: list[str] = []
+            for row in rows:
+                sc = _row_to_scored_chunk(row)
+                ranked_ids.append(sc.chunk.id)
+                existing = chunk_map.get(sc.chunk.id)
+                if existing is None or sc.score > existing.score:
+                    chunk_map[sc.chunk.id] = sc
+            ranked_lists.append(ranked_ids)
 
-    total_time = time.perf_counter() - start_time
+    fused = _rrf_fuse(ranked_lists, chunk_map, top_k)
+
+    elapsed = time.perf_counter() - start_time
     logger.info(
-        "Retrieved %d chunks for query (top_k=%d) in %.3fs — top score: %.4f",
-        len(results), top_k, total_time,
-        results[0].score if results else 0.0,
+        "Hybrid retrieve: %d variants × 2 branches → %d unique → %d fused "
+        "(top_k=%d, filters=%s) in %.3fs — top cosine: %.4f",
+        len(queries), len(chunk_map), len(fused), top_k, filters or "none", elapsed,
+        fused[0].score if fused else 0.0,
     )
-    return results
+    return fused

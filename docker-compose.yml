@@ -1,6 +1,10 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    # ParadeDB ships pg_search (true BM25) alongside pgvector, so both semantic
+    # and lexical search run in-database.
+    # TODO: pin to a specific verified tag (e.g. paradedb/paradedb:0.15.x) for
+    # reproducibility once confirmed against the registry.
+    image: paradedb/paradedb:latest
     environment:
       POSTGRES_USER: raguser
       POSTGRES_PASSWORD: ragpass
