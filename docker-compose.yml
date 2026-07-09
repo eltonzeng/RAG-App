@@ -1,10 +1,8 @@
 services:
   postgres:
     # ParadeDB ships pg_search (true BM25) alongside pgvector, so both semantic
-    # and lexical search run in-database.
-    # TODO: pin to a specific verified tag (e.g. paradedb/paradedb:0.15.x) for
-    # reproducibility once confirmed against the registry.
-    image: paradedb/paradedb:latest
+    # and lexical search run in-database. Pinned for reproducibility.
+    image: paradedb/paradedb:0.24.1-pg16
     environment:
       POSTGRES_USER: raguser
       POSTGRES_PASSWORD: ragpass
