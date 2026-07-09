@@ -171,7 +171,7 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
 
     # Rerank
     try:
-        reranked, is_relevant = rerank(body.query, scored_chunks, top_n=body.top_n)
+        reranked, is_relevant = await rerank(body.query, scored_chunks, top_n=body.top_n)
     except Exception as e:
         logger.error("Reranking failed: %s", e)
         raise HTTPException(status_code=503, detail="Reranking service unavailable")

@@ -15,10 +15,14 @@ from api.models import ScoredChunk
 logger = logging.getLogger(__name__)
 
 RERANK_MODEL = "rerank-english-v3.0"
-RELEVANCE_THRESHOLD = 0.3  # Below this, content is considered not relevant
+RELEVANCE_THRESHOLD = 0.3  # Below this, Cohere-reranked content is not relevant
+# Cosine similarities rarely fall below 0.3 even for irrelevant chunks, so the
+# Cohere threshold cannot be reused on the fallback path. This threshold is
+# calibrated for the cosine similarity distribution instead.
+FALLBACK_SIMILARITY_THRESHOLD = 0.6
 
 
-def rerank(
+async def rerank(
     query: str,
     scored_chunks: list[ScoredChunk],
     top_n: int = 5,
@@ -47,8 +51,8 @@ def rerank(
     documents = [sc.chunk.content for sc in scored_chunks]
 
     try:
-        client = cohere.Client()
-        response = client.rerank(
+        client = cohere.AsyncClient()
+        response = await client.rerank(
             model=RERANK_MODEL,
             query=query,
             documents=documents,
@@ -90,8 +94,17 @@ def rerank(
         logger.warning(
             "Cohere rerank failed, falling back to similarity top-%d: %s", top_n, e
         )
-        # Fallback: return top-N by similarity score
+        # Fallback: return top-N by cosine similarity score. Use a threshold
+        # calibrated for cosine similarity — the Cohere RELEVANCE_THRESHOLD does
+        # not apply here (cosine scores are distributed differently), so reusing
+        # it would silently disable the anti-hallucination guard while Cohere is
+        # down.
         fallback = sorted(scored_chunks, key=lambda sc: sc.score, reverse=True)[:top_n]
         max_score = max(sc.score for sc in fallback) if fallback else 0.0
-        is_relevant = max_score >= RELEVANCE_THRESHOLD
+        is_relevant = max_score >= FALLBACK_SIMILARITY_THRESHOLD
+        logger.warning(
+            "Using degraded similarity fallback (Cohere unavailable): max cosine "
+            "score %.4f vs fallback threshold %.2f → relevant=%s",
+            max_score, FALLBACK_SIMILARITY_THRESHOLD, is_relevant,
+        )
         return fallback, is_relevant

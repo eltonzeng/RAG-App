@@ -5,6 +5,7 @@ results into the pgvector chunks table. Includes retry logic for
 OpenAI rate limits.
 """
 
+import asyncio
 import logging
 import time
 import uuid
@@ -50,7 +51,7 @@ async def _embed_batch(client: AsyncOpenAI, texts: list[str]) -> list[list[float
                 "OpenAI rate limit hit (attempt %d/%d). Retrying in %.1fs: %s",
                 attempt + 1, MAX_RETRIES, delay, e,
             )
-            time.sleep(delay)
+            await asyncio.sleep(delay)
         except Exception as e:
             logger.error("OpenAI embedding error on attempt %d: %s", attempt + 1, e)
             raise
