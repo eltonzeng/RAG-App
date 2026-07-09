@@ -152,7 +152,7 @@ class TestAskEndpoint:
         """Successful ask should return answer with citations."""
         with (
             patch("api.routes.retrieve", new_callable=AsyncMock) as mock_retrieve,
-            patch("api.routes.rerank") as mock_rerank,
+            patch("api.routes.rerank", new_callable=AsyncMock) as mock_rerank,
             patch("api.routes.generate", new_callable=AsyncMock) as mock_generate,
         ):
             mock_retrieve.return_value = [sample_scored_chunk]
@@ -183,7 +183,7 @@ class TestAskEndpoint:
 
         with (
             patch("api.routes.retrieve", new_callable=AsyncMock) as mock_retrieve,
-            patch("api.routes.rerank") as mock_rerank,
+            patch("api.routes.rerank", new_callable=AsyncMock) as mock_rerank,
             patch("api.routes.generate", new_callable=AsyncMock) as mock_generate,
         ):
             mock_retrieve.return_value = []

@@ -149,7 +149,7 @@ def chunk_sentence(
     """
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=500,
-        chunk_overlap=100,
+        chunk_overlap=chunk_overlap,
         separators=["\n\n", "\n", ". ", "? ", "! ", " ", ""],
         length_function=len,
     )
