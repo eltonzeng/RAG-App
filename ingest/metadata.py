@@ -94,13 +94,18 @@ def extract_filing_metadata(doc: Document) -> dict:
     if year_match:
         result["fiscal_year"] = int(year_match.group(1))
 
-    quarter_match = _QUARTER_RE.search(haystack)
-    if quarter_match:
-        result["quarter"] = int(quarter_match.group(1))
-    else:
-        word_match = _QUARTER_WORD_RE.search(head)
-        if word_match:
-            result["quarter"] = _WORD_TO_QUARTER[word_match.group(1).lower()]
+    # A 10-K is an annual filing with no quarter. Skip quarter extraction for it
+    # so incidental phrasing like "first quarter of fiscal 2025" in the MD&A does
+    # not mislabel the whole filing as Q1 (which would corrupt its provenance and
+    # any later quarter filter). Only 10-Q / unknown-form filings carry a quarter.
+    if result.get("form_type") != "10-K":
+        quarter_match = _QUARTER_RE.search(haystack)
+        if quarter_match:
+            result["quarter"] = int(quarter_match.group(1))
+        else:
+            word_match = _QUARTER_WORD_RE.search(head)
+            if word_match:
+                result["quarter"] = _WORD_TO_QUARTER[word_match.group(1).lower()]
 
     ticker_match = _FILENAME_TICKER_RE.search(filename) or _CONTENT_TICKER_RE.search(head)
     if ticker_match:

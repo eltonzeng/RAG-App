@@ -1,7 +1,7 @@
 """Generation evaluation: run the full pipeline, then judge each answer.
 
 Exercises the same path as POST /ask — rewrite → hybrid retrieve → rerank →
-generate — and grades the answer with the Opus 4.8 judge. Aggregates mean judge
+generate — and grades the answer with the Sonnet 5 judge. Aggregates mean judge
 scores plus a groundedness pass-rate.
 """
 
@@ -46,7 +46,9 @@ async def _answer_and_judge(
             rewrite.queries, rewrite.filters.as_containment(), db_pool, top_k=TOP_K
         )
         reranked, is_relevant = await rerank(question, scored, top_n=TOP_N)
-        answer, citations = await generate(question, reranked, is_relevant)
+        answer, citations = await generate(
+            question, reranked, is_relevant, rewrite.filters.as_containment()
+        )
         verdict = await judge_answer(question, answer, reranked, citations)
         logger.info(
             "Judged '%s' — faithful=%d cite=%d rel=%d grounded=%s",

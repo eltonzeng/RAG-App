@@ -1,12 +1,12 @@
-"""LLM-as-judge for generation quality (Claude Opus 4.8).
+"""LLM-as-judge for generation quality (Claude Sonnet 5).
 
 Grades a generated answer against the exact context it was given, scoring
 faithfulness, citation accuracy, and answer relevance. Uses a forced tool call
 for reliable structured output (mirrors generation.query_rewriter and stays
 compatible with the pinned anthropic SDK).
 
-The judge is deliberately a stronger model than the sonnet-4 generator it grades,
-so its verdicts are trustworthy and free of judge==generator self-consistency bias.
+The judge is a newer model than the sonnet-4 generator it grades, keeping
+verdicts independent of judge==generator self-consistency bias.
 """
 
 import logging
@@ -23,7 +23,7 @@ from evals.prompts import (
 
 logger = logging.getLogger(__name__)
 
-JUDGE_MODEL = "claude-opus-4-8"
+JUDGE_MODEL = "claude-sonnet-5"
 MAX_TOKENS = 1024
 
 _VERDICT_TOOL = {

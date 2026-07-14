@@ -107,11 +107,14 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
         conn: The newly created asyncpg connection.
     """
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    # pgvector installs the `vector` type in the `public` schema (not
+    # `pg_catalog`); asyncpg's set_type_codec must be told the correct schema or
+    # it raises "unknown type: pg_catalog.vector" and pool init fails entirely.
     await conn.set_type_codec(
         "vector",
         encoder=lambda v: str(v),
         decoder=lambda v: [float(x) for x in v.strip("[]").split(",")],
-        schema="pg_catalog",
+        schema="public",
         format="text",
     )
 

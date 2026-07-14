@@ -16,6 +16,7 @@ from generation.prompts import (
     SYSTEM_PROMPT,
     USER_PROMPT_TEMPLATE,
     build_context_block,
+    relevant_sources,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,11 +25,17 @@ GENERATION_MODEL = "claude-sonnet-4-20250514"
 MAX_TOKENS = 1024
 
 
-def _extract_citations(scored_chunks: list[ScoredChunk]) -> list[Citation]:
+def _extract_citations(
+    scored_chunks: list[ScoredChunk],
+    filters: dict | None = None,
+) -> list[Citation]:
     """Build citation objects from the chunks that were passed to the generator.
 
     Args:
         scored_chunks: The reranked chunks used as context for generation.
+        filters: Metadata filters applied at retrieval time. When set, a
+            deduplicated chunk's sources are narrowed to those matching the
+            filter so we never cite a filing the user filtered out.
 
     Returns:
         Deduplicated list of Citation objects derived from chunk metadata.
@@ -39,12 +46,17 @@ def _extract_citations(scored_chunks: list[ScoredChunk]) -> list[Citation]:
     for sc in scored_chunks:
         chunk = sc.chunk
         # A deduplicated chunk may appear in several filings; emit one citation
-        # per distinct (source, page). Fall back to top-level metadata if the
-        # sources array is absent (e.g. legacy/mocked chunks).
-        sources = chunk.metadata.get("sources") or [{
-            "source_filename": chunk.metadata.get("source_filename", "Unknown"),
-            "page_number": chunk.metadata.get("page_number"),
-        }]
+        # per distinct (source, page), narrowed to the applied filter. Fall back
+        # to top-level metadata if the sources array is absent (e.g. legacy/
+        # mocked chunks).
+        raw_sources = chunk.metadata.get("sources")
+        if raw_sources:
+            sources = relevant_sources(raw_sources, filters)
+        else:
+            sources = [{
+                "source_filename": chunk.metadata.get("source_filename", "Unknown"),
+                "page_number": chunk.metadata.get("page_number"),
+            }]
 
         for src in sources:
             source = src.get("source_filename", "Unknown")
@@ -61,6 +73,7 @@ async def generate(
     query: str,
     scored_chunks: list[ScoredChunk],
     is_relevant: bool,
+    filters: dict | None = None,
 ) -> tuple[str, list[Citation]]:
     """Generate an answer from context chunks using Claude.
 
@@ -74,6 +87,9 @@ async def generate(
         query: The user's natural language question.
         scored_chunks: Reranked chunks to use as context.
         is_relevant: Whether any chunk exceeded the relevance threshold.
+        filters: Metadata filters applied at retrieval time. When set, each
+            deduplicated chunk's sources are narrowed to the matching filings for
+            both the context labels and the emitted citations.
 
     Returns:
         Tuple of (answer_text, citations).
@@ -86,7 +102,7 @@ async def generate(
         return NO_RELEVANT_CONTENT_RESPONSE, []
 
     start_time = time.perf_counter()
-    context_block = build_context_block(scored_chunks)
+    context_block = build_context_block(scored_chunks, filters)
     user_message = USER_PROMPT_TEMPLATE.format(
         context=context_block,
         query=query,
@@ -117,5 +133,5 @@ async def generate(
         logger.error("Anthropic API error during generation: %s", e)
         raise
 
-    citations = _extract_citations(scored_chunks)
+    citations = _extract_citations(scored_chunks, filters)
     return answer, citations

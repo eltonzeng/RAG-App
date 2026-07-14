@@ -193,9 +193,10 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
 
     chunks_used = len(reranked)
 
-    # Generate
+    # Generate. Pass the applied filters so citations/context are narrowed to the
+    # matching filings when a deduplicated chunk spans several.
     try:
-        answer, citations = await generate(body.query, reranked, is_relevant)
+        answer, citations = await generate(body.query, reranked, is_relevant, filters)
     except Exception as e:
         logger.error("Generation failed: %s", e)
         raise HTTPException(status_code=503, detail="Generation service unavailable")

@@ -12,10 +12,7 @@ import logging
 import uuid
 
 import tiktoken
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
-    SentenceTransformersTokenTextSplitter,
-)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from api.models import Chunk, Document
 
