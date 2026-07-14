@@ -12,5 +12,8 @@ venv/
 # Eval outputs (generated per run)
 evals/reports/
 
+# Ingested filings (large binaries — fetch from EDGAR, don't commit)
+filings/
+
 # OS
 .DS_Store

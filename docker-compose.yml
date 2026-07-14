@@ -1,16 +1,19 @@
 services:
   postgres:
     # ParadeDB ships pg_search (true BM25) alongside pgvector, so both semantic
-    # and lexical search run in-database.
-    # TODO: pin to a specific verified tag (e.g. paradedb/paradedb:0.15.x) for
-    # reproducibility once confirmed against the registry.
-    image: paradedb/paradedb:latest
+    # and lexical search run in-database. Pinned to a PG16 tag: :latest now
+    # resolves to a PG18 image whose data-directory layout is incompatible
+    # with this compose file's volume mount.
+    image: paradedb/paradedb:0.24.1-pg16
     environment:
       POSTGRES_USER: raguser
       POSTGRES_PASSWORD: ragpass
       POSTGRES_DB: ragdb
     ports:
-      - "5432:5432"
+      # Host 5434 -> container 5432. 5432 is taken by a local Postgres.app
+      # instance and 5433 by another project's container on this machine;
+      # the container's internal port is unaffected.
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql

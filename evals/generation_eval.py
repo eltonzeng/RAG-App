@@ -60,6 +60,7 @@ async def run_generation_eval(
     db_pool: asyncpg.Pool,
     dataset_path: Path = DATASET_PATH,
     concurrency: int = 3,
+    limit: int | None = None,
 ) -> dict[str, float]:
     """Run the generation suite over the dataset.
 
@@ -67,12 +68,16 @@ async def run_generation_eval(
         db_pool: asyncpg pool.
         dataset_path: Path to the gold dataset.
         concurrency: Max concurrent pipeline+judge runs.
+        limit: If set, evaluate only the first N dataset rows (smoke testing;
+            keeps Opus judge costs bounded while iterating).
 
     Returns:
         Aggregate metrics: mean faithfulness / citation_accuracy /
         answer_relevance, groundedness pass-rate, and judge_error_rate.
     """
     dataset = load_dataset(dataset_path)
+    if limit is not None:
+        dataset = dataset[:limit]
     logger.info("Running generation eval over %d questions", len(dataset))
     if not dataset:
         return {

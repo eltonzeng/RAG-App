@@ -41,9 +41,26 @@ filing doesn't invalidate your labels.
 
 ## Seed rows
 
-The committed rows are **placeholders**: every `source_filename` is
-`REPLACE_WITH_YOUR_FILING.pdf` and every `page_number` is `0`. They cover common
-10-K topics (revenue, risk factors, R&D, segments, liquidity, cyber, cash flow,
-governance) so you have a starting scaffold — replace the `gold` values with real
-labels against your ingested filings before the numbers mean anything. Add more
-rows freely; 30–50 well-labeled questions is a solid benchmark.
+The committed rows target six FY2025 10-Ks fetched from EDGAR (see `filings/`),
+spanning three themes:
+
+| Ticker | Company | Sector |
+|--------|---------|--------|
+| COHR | Coherent Corp | Photonics |
+| AAOI | Applied Optoelectronics | Photonics |
+| MU | Micron Technology | Memory |
+| SNDK | Sandisk Corp | Memory |
+| OUST | Ouster | Physical AI (lidar) |
+| SERV | Serve Robotics | Physical AI (robotics) |
+
+Each company has four sector-specific questions (with `ticker`/`fiscal_year`
+filters), plus three cross-filing `theme*` questions whose `gold` spans multiple
+filings — these exercise the metrics' credit-once rule against real multi-source
+gold.
+
+**The `source_filename` values are real** (they match the PDFs in `filings/`), but
+every `page_number` is still `0` — a "needs labeling" sentinel. Ingest the six
+filings, then replace each `page_number` with the page that actually answers the
+question (open the PDF and read; see the labeling guide above). The numbers are
+meaningless until the pages are labeled. Add more rows freely; 30–50 well-labeled
+questions is a solid benchmark.

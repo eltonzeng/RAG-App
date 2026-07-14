@@ -113,6 +113,7 @@ async def run_retrieval_eval(
     db_pool: asyncpg.Pool,
     variant_names: list[str] | None = None,
     dataset_path: Path = DATASET_PATH,
+    limit: int | None = None,
 ) -> dict[str, dict[str, float]]:
     """Evaluate the requested variants over the dataset.
 
@@ -120,11 +121,14 @@ async def run_retrieval_eval(
         db_pool: asyncpg pool.
         variant_names: Subset of VARIANTS to run; None runs all.
         dataset_path: Path to the gold dataset.
+        limit: If set, evaluate only the first N dataset rows (smoke testing).
 
     Returns:
         Mapping of variant name → metrics dict.
     """
     dataset = load_dataset(dataset_path)
+    if limit is not None:
+        dataset = dataset[:limit]
     logger.info("Loaded %d gold questions from %s", len(dataset), dataset_path)
 
     names = variant_names or list(VARIANTS)

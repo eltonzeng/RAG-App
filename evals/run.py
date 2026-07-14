@@ -5,6 +5,7 @@ Examples:
     python -m evals.run --suite retrieval --variants semantic_only,hybrid
     python -m evals.run --suite retrieval --fail-under hybrid.recall@10=0.6
     python -m evals.run --suite generation --concurrency 3
+    python -m evals.run --suite generation --limit 5   # smoke test, bounds Opus judge cost
 
 Requires a running ParadeDB (with filings ingested) and the relevant API keys in
 the environment. The retrieval suite needs OpenAI + DB; the generation suite also
@@ -58,10 +59,14 @@ async def _run(args: argparse.Namespace) -> int:
             variant_names = (
                 [v.strip() for v in args.variants.split(",")] if args.variants else None
             )
-            results = await run_retrieval_eval(pool, variant_names=variant_names)
+            results = await run_retrieval_eval(
+                pool, variant_names=variant_names, limit=args.limit
+            )
             table = render_markdown_table(results, row_label="variant")
         else:
-            gen = await run_generation_eval(pool, concurrency=args.concurrency)
+            gen = await run_generation_eval(
+                pool, concurrency=args.concurrency, limit=args.limit
+            )
             results = {"generation": gen}
             table = render_markdown_table(results, row_label="suite")
     finally:
@@ -102,6 +107,11 @@ def main() -> None:
     parser.add_argument(
         "--fail-under", action="append", default=[], metavar="KEY=FLOOR",
         help="Exit non-zero if a metric is below the floor, e.g. hybrid.recall@10=0.6.",
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, metavar="N",
+        help="Evaluate only the first N dataset rows. Useful for smoke-testing "
+             "before a full run, especially to bound Opus judge cost.",
     )
     args = parser.parse_args()
 
