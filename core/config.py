@@ -31,6 +31,8 @@ class Settings(BaseSettings):
         cohere_timeout_s: Per-request timeout for Cohere rerank calls (seconds).
         relevance_threshold: Min Cohere rerank score to treat content as
             relevant; below it the API returns a graceful "no info" message.
+        pdf_extract_tables: When True, detect tables during PDF ingest and
+            render them as Markdown to preserve alignment for numeric queries.
         database_url: asyncpg DSN for the ParadeDB/pgvector store.
         rag_api_key: When set, /ask and /ingest require a matching X-API-Key
             header; when unset (default), the API is open for local dev.
@@ -57,6 +59,9 @@ class Settings(BaseSettings):
 
     # Pipeline behavior
     relevance_threshold: float = 0.3
+    # Detect tables in PDFs and render them as Markdown (preserves column/row
+    # alignment for numeric queries). Disable for plain-text-only extraction.
+    pdf_extract_tables: bool = True
 
     # Services
     database_url: str = "postgresql://raguser:ragpass@localhost:5434/ragdb"

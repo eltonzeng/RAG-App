@@ -35,6 +35,7 @@ module = [
     "cohere.*",
     "streamlit.*",
     "langchain_text_splitters.*",
+    "pdfplumber.*",
     "pgvector.*",
     "psycopg2.*",
     "asyncpg.*",

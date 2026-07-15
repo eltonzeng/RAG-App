@@ -30,7 +30,8 @@ as first-class deliverables alongside functionality.
           ┌────────────────────┴─────────────────────┐
           ▼ ingestion                                 ▼ query pipeline
   loader.py  (PDF / TXT / URL)             query_rewriter.py  (Claude Haiku)
-  metadata.py (ticker/year/form)           └─ 3–4 query variants + metadata filters
+   └─ pdfplumber table → Markdown          └─ 3–4 query variants + metadata filters
+  metadata.py (ticker/year/form)                           │
   chunker.py (fixed/recursive/sentence)                    │
   embedder.py                             retriever.py  — hybrid, per variant:
    └─ OpenAI batch embed                    ├─ semantic: pgvector cosine (IVFFlat)
@@ -107,6 +108,7 @@ pure env change, never a code edit.
 | `RERANK_MODEL` | `rerank-english-v3.0` | Cohere reranker |
 | `JUDGE_MODEL` | `claude-sonnet-5` | LLM-as-judge (generation eval) |
 | `RELEVANCE_THRESHOLD` | `0.3` | Below this → graceful "no info" answer |
+| `PDF_EXTRACT_TABLES` | `true` | Render PDF tables as Markdown (vs. plain text) |
 | `{OPENAI,ANTHROPIC}_TIMEOUT_S` / `_MAX_RETRIES` | 30/3, 60/2 | Client reliability |
 | `COHERE_TIMEOUT_S` | `15` | Client reliability |
 | `RAG_API_KEY` | _(unset)_ | When set, `/ask` + `/ingest` require `X-API-Key` |
@@ -169,6 +171,12 @@ python -m evals.run --suite generation --concurrency 2 --pace 2
 - **Hybrid + RRF over pure vector search.** Dense search misses exact-term queries
   (ticker symbols, GAAP line items) that BM25 nails; RRF fuses both rankings without
   tuning score scales.
+- **Table-aware PDF extraction.** Plain text extractors flatten a financial table
+  into number-soup that loses which figure belongs to which column/year. `pdfplumber`
+  recovers the grid; each table is rendered as a Markdown pipe table and emitted as
+  its **own** chunk (so the splitter never breaks it mid-grid) with its cells removed
+  from the page's narrative text (so figures aren't double-counted). Falls back to
+  plain text per-page, then to `pypdf`, so a filing never fails to ingest.
 - **Reranking is never optional.** If Cohere fails, retrieval falls back to a
   cosine-calibrated similarity gate (a separate threshold, since cosine and Cohere
   scores are distributed differently) — it never silently skips the relevance check.

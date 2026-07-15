@@ -114,7 +114,9 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
     for path in body.file_paths:
         try:
             if path.endswith(".pdf"):
-                documents.extend(load_pdf(path))
+                documents.extend(
+                    load_pdf(path, extract_tables=get_settings().pdf_extract_tables)
+                )
             elif path.endswith(".txt"):
                 documents.extend(load_txt(path))
             else:

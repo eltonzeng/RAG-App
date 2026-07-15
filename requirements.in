@@ -24,7 +24,8 @@ asyncpg>=0.29.0
 pgvector>=0.3.0
 
 # Document processing
-pypdf>=4.0
+pdfplumber>=0.11          # table-aware PDF extraction (primary)
+pypdf>=4.0                # plain-text fallback when pdfplumber can't open a file
 beautifulsoup4>=4.12.0
 requests>=2.31.0
 tiktoken>=0.7.0
