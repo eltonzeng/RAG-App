@@ -8,36 +8,54 @@ import logging
 from contextlib import asynccontextmanager
 
 import asyncpg
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from api.middleware import RequestIdMiddleware
 from api.routes import router
+from core.config import get_settings
+from core.logging import configure_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-)
+configure_logging(get_settings().log_format)
 logger = logging.getLogger(__name__)
 
-# These are imported lazily in routes to avoid circular deps,
-# but we expose them here as single source of truth.
-EMBEDDING_MODEL = "text-embedding-3-small"
-GENERATION_MODEL = "claude-sonnet-4-20250514"
 
+async def create_pool(
+    min_size: int = 2,
+    max_size: int = 10,
+    command_timeout: float = 30,
+) -> asyncpg.Pool:
+    """Create an asyncpg pool with the pgvector codec registered.
 
-def _get_database_url() -> str:
-    """Read DATABASE_URL from environment, raising clearly if missing.
+    Loads DATABASE_URL from the environment and normalizes the scheme. Shared by
+    the FastAPI lifespan and offline tooling (e.g. the eval harness) so both talk
+    to the database the same way.
+
+    Args:
+        min_size: Minimum number of connections in the pool.
+        max_size: Maximum number of connections in the pool.
+        command_timeout: Per-command timeout in seconds.
 
     Returns:
-        The database connection string.
-
-    Raises:
-        RuntimeError: If DATABASE_URL is not set.
+        An initialized asyncpg connection pool.
     """
-    import os
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL environment variable is not set")
-    return url
+    db_url = get_settings().database_url
+
+    # asyncpg requires the scheme to be postgresql:// not postgres://
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    logger.info("Creating database connection pool")
+    pool = await asyncpg.create_pool(
+        dsn=db_url,
+        min_size=min_size,
+        max_size=max_size,
+        command_timeout=command_timeout,
+        init=_init_connection,
+    )
+    logger.info("Database pool created successfully")
+    return pool
 
 
 @asynccontextmanager
@@ -50,25 +68,8 @@ async def lifespan(app: FastAPI):
     Yields:
         Control to the application while the pool is active.
     """
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    db_url = _get_database_url()
-
-    # asyncpg requires the scheme to be postgresql:// not postgres://
-    if db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-
-    logger.info("Creating database connection pool")
-    pool = await asyncpg.create_pool(
-        dsn=db_url,
-        min_size=2,
-        max_size=10,
-        command_timeout=30,
-        init=_init_connection,
-    )
+    pool = await create_pool()
     app.state.pool = pool
-    logger.info("Database pool created successfully")
 
     yield
 
@@ -84,11 +85,14 @@ async def _init_connection(conn: asyncpg.Connection) -> None:
         conn: The newly created asyncpg connection.
     """
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    # pgvector installs the `vector` type in the `public` schema (not
+    # `pg_catalog`); asyncpg's set_type_codec must be told the correct schema or
+    # it raises "unknown type: pg_catalog.vector" and pool init fails entirely.
     await conn.set_type_codec(
         "vector",
         encoder=lambda v: str(v),
         decoder=lambda v: [float(x) for x in v.strip("[]").split(",")],
-        schema="pg_catalog",
+        schema="public",
         format="text",
     )
 
@@ -99,5 +103,30 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Correlation IDs first (inner), so CORS wraps it on the response.
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origin_list,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Backstop: never leak a stack trace; return a correlated JSON 500.
+
+    Route handlers still map their known failures to specific HTTP errors; this
+    only catches genuinely unexpected exceptions.
+    """
+    request_id = getattr(request.state, "request_id", "")
+    logger.exception("Unhandled error processing %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request_id},
+    )
+
 
 app.include_router(router)

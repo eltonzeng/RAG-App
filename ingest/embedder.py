@@ -7,27 +7,25 @@ the chunk's ``sources`` JSONB array. New content is embedded via OpenAI
 text-embedding-3-small and upserted into the pgvector/ParadeDB chunks table.
 """
 
-import asyncio
 import hashlib
 import json
 import logging
 import re
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import asyncpg
-from openai import AsyncOpenAI, RateLimitError
+from openai import AsyncOpenAI
 
 from api.models import Chunk
+from core.clients import get_openai_client
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 1536
 BATCH_SIZE = 100
-MAX_RETRIES = 3
-RETRY_BASE_DELAY = 2.0  # seconds, doubles each retry
 
 # Keys copied from a chunk's metadata into its `sources` provenance element.
 # (chunk_index is a Chunk attribute, added separately.)
@@ -85,7 +83,11 @@ def _source_element(chunk: Chunk) -> dict:
 
 
 async def _embed_batch(client: AsyncOpenAI, texts: list[str]) -> list[list[float]]:
-    """Call OpenAI embeddings API for a batch of texts with retry logic.
+    """Call the OpenAI embeddings API for a batch of texts.
+
+    Rate-limit and transient-error retries (with backoff) are handled by the
+    shared client's ``max_retries`` budget — see ``core.clients`` — so this
+    function stays a thin, single-attempt wrapper.
 
     Args:
         client: Async OpenAI client instance.
@@ -95,27 +97,17 @@ async def _embed_batch(client: AsyncOpenAI, texts: list[str]) -> list[list[float
         List of embedding vectors (one per input text).
 
     Raises:
-        RuntimeError: If all retries are exhausted.
+        Exception: If the embeddings call fails after the client's retries.
     """
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = await client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=texts,
-            )
-            return [item.embedding for item in response.data]
-        except RateLimitError as e:
-            delay = RETRY_BASE_DELAY * (2 ** attempt)
-            logger.warning(
-                "OpenAI rate limit hit (attempt %d/%d). Retrying in %.1fs: %s",
-                attempt + 1, MAX_RETRIES, delay, e,
-            )
-            await asyncio.sleep(delay)
-        except Exception as e:
-            logger.error("OpenAI embedding error on attempt %d: %s", attempt + 1, e)
-            raise
-
-    raise RuntimeError(f"OpenAI embedding failed after {MAX_RETRIES} retries")
+    try:
+        response = await client.embeddings.create(
+            model=get_settings().embedding_model,
+            input=texts,
+        )
+        return [item.embedding for item in response.data]
+    except Exception as e:
+        logger.error("OpenAI embedding call failed: %s", e)
+        raise
 
 
 def _dedupe_chunks(chunks: list[Chunk]) -> dict[str, dict]:
@@ -184,10 +176,13 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
 
     logger.info(
         "Ingesting %d chunks → %d unique (%d new, %d duplicate)",
-        len(chunks), len(all_hashes), len(new_hashes), len(existing_hashes),
+        len(chunks),
+        len(all_hashes),
+        len(new_hashes),
+        len(existing_hashes),
     )
 
-    client = AsyncOpenAI()
+    client = get_openai_client()
 
     # 1) Append provenance for content that already exists — no embedding cost.
     if existing_hashes:
@@ -198,8 +193,9 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
                     await conn.execute(
                         f"""
                         UPDATE chunks
-                        SET sources = ({_MERGE_SOURCES_SQL.format(
-                            left="sources", right="$2::jsonb")})
+                        SET sources = ({
+                            _MERGE_SOURCES_SQL.format(left="sources", right="$2::jsonb")
+                        })
                         WHERE content_hash = $1
                         """,
                         digest,
@@ -210,7 +206,7 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
             raise
 
     # 2) Embed and insert new content in batches.
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     for batch_start in range(0, len(new_hashes), BATCH_SIZE):
         batch_hashes = new_hashes[batch_start : batch_start + BATCH_SIZE]
         texts = [by_hash[h]["content"] for h in batch_hashes]
@@ -220,21 +216,25 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
         except Exception as e:
             logger.error(
                 "Failed to embed batch %d-%d: %s",
-                batch_start, batch_start + len(batch_hashes), e,
+                batch_start,
+                batch_start + len(batch_hashes),
+                e,
             )
             raise
 
         records = []
-        for digest, embedding in zip(batch_hashes, embeddings):
+        for digest, embedding in zip(batch_hashes, embeddings, strict=True):
             entry = by_hash[digest]
-            records.append((
-                uuid.uuid4(),
-                digest,
-                entry["content"],
-                embedding,
-                json.dumps(entry["sources"]),
-                now,
-            ))
+            records.append(
+                (
+                    uuid.uuid4(),
+                    digest,
+                    entry["content"],
+                    embedding,
+                    json.dumps(entry["sources"]),
+                    now,
+                )
+            )
 
         try:
             async with db_pool.acquire() as conn:
@@ -246,19 +246,24 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
                         (id, content_hash, content, embedding, sources, ingested_at)
                     VALUES ($1, $2, $3, $4::vector, $5::jsonb, $6)
                     ON CONFLICT (content_hash) DO UPDATE SET
-                        sources = ({_MERGE_SOURCES_SQL.format(
-                            left="chunks.sources", right="EXCLUDED.sources")})
+                        sources = ({
+                        _MERGE_SOURCES_SQL.format(left="chunks.sources", right="EXCLUDED.sources")
+                    })
                     """,
                     records,
                 )
             logger.info(
                 "Stored batch %d-%d (%d new chunks)",
-                batch_start, batch_start + len(batch_hashes), len(batch_hashes),
+                batch_start,
+                batch_start + len(batch_hashes),
+                len(batch_hashes),
             )
         except Exception as e:
             logger.error(
                 "Database insert failed for batch %d-%d: %s",
-                batch_start, batch_start + len(batch_hashes), e,
+                batch_start,
+                batch_start + len(batch_hashes),
+                e,
             )
             raise
 
@@ -267,6 +272,8 @@ async def embed_and_store(chunks: list[Chunk], db_pool: asyncpg.Pool) -> tuple[i
     skipped = len(existing_hashes)
     logger.info(
         "Embedding complete: %d new chunks embedded, %d skipped (duplicate) in %.2fs",
-        embedded, skipped, elapsed,
+        embedded,
+        skipped,
+        elapsed,
     )
     return embedded, skipped

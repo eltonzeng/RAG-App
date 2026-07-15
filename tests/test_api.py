@@ -16,9 +16,7 @@ from api.models import Chunk, Citation, MetadataFilters, QueryRewriteResult, Sco
 
 def _rewrite(query: str = "q", **filters) -> QueryRewriteResult:
     """Build a QueryRewriteResult for patching api.routes.rewrite_query."""
-    return QueryRewriteResult(
-        queries=[query], filters=MetadataFilters(**filters)
-    )
+    return QueryRewriteResult(queries=[query], filters=MetadataFilters(**filters))
 
 
 @pytest.fixture
@@ -121,7 +119,7 @@ class TestIngestEndpoint:
         self, async_client: AsyncClient, mock_pool, sample_scored_chunk
     ) -> None:
         """Successful ingest should return 200 with document/chunk counts."""
-        from api.models import Chunk, Document
+        from api.models import Document
 
         with (
             patch("api.routes.load_pdf") as mock_load,
@@ -168,7 +166,7 @@ class TestAskEndpoint:
                 "What was Apple's revenue?", ticker="AAPL", fiscal_year=2023
             )
             mock_retrieve.return_value = [sample_scored_chunk]
-            mock_rerank.return_value = ([sample_scored_chunk], True)
+            mock_rerank.return_value = ([sample_scored_chunk], True, False)
             mock_generate.return_value = (
                 "Revenue was $1.2 billion.",
                 [Citation(source="apple_10k.pdf", page=45, chunk_id="test-chunk-id")],
@@ -208,7 +206,7 @@ class TestAskEndpoint:
         ):
             mock_rewrite.return_value = _rewrite("Completely unrelated question")
             mock_retrieve.return_value = []
-            mock_rerank.return_value = ([], False)
+            mock_rerank.return_value = ([], False, False)
             mock_generate.return_value = (NO_RELEVANT_CONTENT_RESPONSE, [])
 
             response = await async_client.post(

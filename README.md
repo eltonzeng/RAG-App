@@ -1,161 +1,226 @@
-# SEC Filings RAG Application
+# SEC Filings RAG
 
-A production-quality Retrieval-Augmented Generation (RAG) system for querying SEC EDGAR filings (10-K, 10-Q, proxy statements). Built as a portfolio project demonstrating end-to-end AI engineering: ingestion, vector search, reranking, and grounded generation with citations.
+[![CI](https://github.com/eltonzeng/RAG-App/actions/workflows/ci.yml/badge.svg)](https://github.com/eltonzeng/RAG-App/actions/workflows/ci.yml)
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)
+[![Ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+![Coverage](https://img.shields.io/badge/coverage-~71%25-brightgreen.svg)
+
+A retrieval-augmented generation system for querying SEC EDGAR filings (10-K, 10-Q).
+It combines **hybrid retrieval** (dense pgvector + BM25 lexical search, fused with
+Reciprocal Rank Fusion), **LLM query rewriting** with metadata filters, **Cohere
+reranking**, and **grounded Claude generation** with page-level citations — and it ships
+with an **evaluation harness** that quantifies what each pipeline stage actually earns.
+
+Built as a portfolio project: code quality, testing, and honest measurement are treated
+as first-class deliverables alongside functionality.
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Streamlit UI (ui/app.py)                     │
-│    Chat interface · Citation cards · Ingest form · Sidebar stats    │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ HTTP
-┌──────────────────────────────▼──────────────────────────────────────┐
-│                     FastAPI (api/main.py)                           │
-│   POST /ask · POST /ingest · GET /health · asyncpg pool lifespan   │
-└───────┬──────────────────────────────────────┬──────────────────────┘
-        │                                       │
-┌───────▼──────────┐                ┌───────────▼──────────────────┐
-│  Ingestion       │                │  Query Pipeline              │
-│                  │                │                              │
-│  loader.py       │                │  retriever.py                │
-│  ├─ load_pdf()   │                │  └─ embed query (OpenAI)     │
-│  ├─ load_txt()   │                │     └─ cosine search         │
-│  └─ load_urls()  │                │        (pgvector IVFFlat)    │
-│                  │                │                              │
-│  chunker.py      │                │  reranker.py                 │
-│  ├─ fixed        │                │  └─ Cohere Rerank API        │
-│  ├─ recursive ◄──┼── default      │     ├─ score threshold 0.3   │
-│  └─ sentence     │                │     └─ fallback on failure   │
-│                  │                │                              │
-│  embedder.py     │                │  generator.py                │
-│  └─ OpenAI       │                │  └─ Claude (streaming)       │
-│     batch embed  │                │     └─ citation extraction   │
-│     + pgvector   │                │                              │
-│     upsert       │                └──────────────────────────────┘
-└──────────────────┘
-        │                                       │
-┌───────▼───────────────────────────────────────▼──────────────────┐
-│              pgvector (PostgreSQL 16 via Docker)                  │
-│   chunks table · VECTOR(1536) · IVFFlat cosine index             │
-└───────────────────────────────────────────────────────────────────┘
+                      Streamlit UI (ui/app.py)
+              chat · live token streaming (SSE) · citations
+                               │  HTTP
+                               ▼
+                     FastAPI (api/main.py, routes.py)
+        request-id middleware · optional X-API-Key · JSON logs · CORS
+        GET /health   POST /ingest   POST /ask   POST /ask/stream (SSE)
+                               │
+          ┌────────────────────┴─────────────────────┐
+          ▼ ingestion                                 ▼ query pipeline
+  loader.py  (PDF / TXT / URL)             query_rewriter.py  (Claude Haiku)
+   └─ pdfplumber table → Markdown          └─ 3–4 query variants + metadata filters
+  metadata.py (ticker/year/form)                           │
+  chunker.py (fixed/recursive/sentence)                    │
+  embedder.py                             retriever.py  — hybrid, per variant:
+   └─ OpenAI batch embed                    ├─ semantic: pgvector cosine (IVFFlat)
+   └─ content-hash dedup                    ├─ lexical:  ParadeDB pg_search BM25
+   └─ pgvector upsert                       └─ Reciprocal Rank Fusion (RRF)
+          │                                    │  (zero-result → unfiltered retry)
+          │                                 reranker.py — Cohere Rerank v3.5
+          │                                    └─ relevance gate 0.3
+          │                                    └─ degraded cosine fallback if down
+          │                                 generator.py — Claude, streaming
+          │                                    └─ citations narrowed to filter
+          ▼                                       │
+     ParadeDB (Postgres 16 + pgvector + pg_search)
+        chunks · VECTOR(1536) · sources JSONB (provenance + filters)
 ```
+
+Every arrow is explicit code (no LangChain chains), so each stage is independently
+testable, observable, and swappable — and measurable by the eval harness.
 
 ---
 
-## Setup
+## Quickstart
 
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.11+
-- API keys: OpenAI, Anthropic, Cohere
-
-### 1. Clone and configure
 ```bash
-git clone <repo>
-cd rag-project
-cp .env.example .env
-# Edit .env and fill in your API keys
+git clone https://github.com/eltonzeng/RAG-App.git && cd RAG-App
+cp .env.example .env          # fill in OPENAI / ANTHROPIC / COHERE keys
+
+docker compose up --build     # postgres + api + ui, all with healthchecks
 ```
 
-### 2. Start the vector database
+- API + docs: http://localhost:8000/docs
+- UI: http://localhost:8501
+
+Ingest a filing and ask a question:
+
 ```bash
-docker compose up -d
-# Verify: docker compose ps — postgres should show "healthy"
-```
-
-### 3. Install Python dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Start the API server
-```bash
-uvicorn api.main:app --reload
-# API docs: http://localhost:8000/docs
-```
-
-### 5. Start the Streamlit UI
-```bash
-streamlit run ui/app.py
-# UI: http://localhost:8501
-```
-
----
-
-## Usage
-
-### Ingest an SEC filing
-```bash
-# Via curl
 curl -X POST http://localhost:8000/ingest \
   -H "Content-Type: application/json" \
-  -d '{
-    "file_paths": ["/path/to/apple_10k_2023.pdf"],
-    "chunk_strategy": "recursive"
-  }'
+  -d '{"file_paths": ["/path/to/COHR_10-K_2025.pdf"], "chunk_strategy": "recursive"}'
 
-# Via the Streamlit sidebar — paste file paths and click Ingest
-```
-
-### Ask a question
-```bash
 curl -X POST http://localhost:8000/ask \
   -H "Content-Type: application/json" \
-  -d '{"query": "What was Apple revenue in FY2023 and how does it compare to FY2022?"}'
+  -d '{"query": "What was Coherent total revenue in fiscal 2025?"}'
+
+# Streaming (Server-Sent Events: meta → delta* → citations → done)
+curl -N -X POST http://localhost:8000/ask/stream \
+  -H "Content-Type: application/json" -d '{"query": "..."}'
 ```
 
-Response includes the answer, source citations with page numbers, and pipeline latency.
+### Local (without Docker)
 
-### Run tests
 ```bash
-pytest tests/ -v
+pip install -r requirements.txt -r requirements-dev.txt
+docker compose up -d postgres
+uvicorn api.main:app --reload      # API
+streamlit run ui/app.py            # UI
+pytest                             # 105 tests, fully mocked (no DB/API needed)
 ```
 
 ---
 
-## Tech Stack & Decisions
+## Configuration
 
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| **Vector DB** | pgvector (PostgreSQL 16) | SQL familiarity, no extra infra, IVFFlat index for cosine similarity |
-| **Embeddings** | OpenAI text-embedding-3-small | Cost-efficient, 1536-dim, strong performance on financial text |
-| **Generation** | Claude claude-sonnet-4-20250514 | Strong instruction-following; grounded answers with "I don't know" |
-| **Reranking** | Cohere Rerank v3 | Cross-encoder dramatically improves retrieval precision |
-| **Chunking** | Recursive (default), Fixed, Sentence | Recursive preserves paragraph boundaries best for dense filings |
-| **Framework** | FastAPI + asyncpg | Async-native; production-ready; Pydantic v2 validation |
-| **UI** | Streamlit | Fast prototyping; native chat + expander for citations |
+Everything tunable is centralized in `core/config.py` (pydantic-settings) and
+overridable via environment variables — so switching models for a benchmark run is a
+pure env change, never a code edit.
 
-### Why explicit retrieval steps, not LangChain chains?
-
-LangChain's built-in chains (e.g., `RetrievalQA`) abstract away the reranking step and make it difficult to inject Cohere between retrieval and generation. Building explicit steps in `retriever.py` → `reranker.py` → `generator.py` keeps each stage testable, observable, and swappable independently.
-
-### Why a relevance threshold of 0.3?
-
-Cohere relevance scores range [0, 1]. Empirically, scores below 0.3 indicate the top retrieved chunks are not meaningfully related to the query. Returning "I don't have enough information" rather than generating an answer from weak context prevents hallucination — critical for financial document Q&A.
-
-### Why IVFFlat over HNSW?
-
-IVFFlat with `lists=100` is appropriate for datasets up to ~1M vectors and requires less memory than HNSW. For larger corpora, switching to `HNSW (m=16, ef_construction=64)` would improve recall at the cost of build time.
-
-### Streaming: collected vs. SSE
-
-The Anthropic SDK streams tokens via `client.messages.stream()`, but the `/ask` endpoint collects the full response before returning JSON. This keeps the API simple (single Pydantic response model) at MVP stage. True Server-Sent Events would reduce time-to-first-token but adds complexity to both the API and UI.
+| Variable | Default | Purpose |
+|---|---|---|
+| `DATABASE_URL` | `postgresql://…@localhost:5434/ragdb` | ParadeDB DSN |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embeddings |
+| `GENERATION_MODEL` | `claude-sonnet-4-6` | Answer generation |
+| `QUERY_REWRITE_MODEL` | `claude-haiku-4-5-20251001` | Multi-query + filter extraction |
+| `RERANK_MODEL` | `rerank-english-v3.0` | Cohere reranker |
+| `JUDGE_MODEL` | `claude-sonnet-5` | LLM-as-judge (generation eval) |
+| `RELEVANCE_THRESHOLD` | `0.3` | Below this → graceful "no info" answer |
+| `PDF_EXTRACT_TABLES` | `true` | Render PDF tables as Markdown (vs. plain text) |
+| `{OPENAI,ANTHROPIC}_TIMEOUT_S` / `_MAX_RETRIES` | 30/3, 60/2 | Client reliability |
+| `COHERE_TIMEOUT_S` | `15` | Client reliability |
+| `RAG_API_KEY` | _(unset)_ | When set, `/ask` + `/ingest` require `X-API-Key` |
+| `CORS_ORIGINS` | `http://localhost:8501` | Allowed origins |
+| `LOG_FORMAT` | `text` | `json` for structured logs (Docker default) |
 
 ---
 
-## Known Limitations
+## Evaluation
 
-1. **PDF table extraction**: `pypdf` extracts text but does not reconstruct table structure. Financial tables in 10-K filings may lose column alignment, affecting numerical comparisons. Future: integrate `pdfplumber` for table-aware extraction.
+The harness (`evals/`, docs in [evals/README.md](evals/README.md)) measures the two
+things that fail independently.
 
-2. **No document deduplication**: Re-ingesting the same file creates duplicate chunks. Future: hash content before insert, skip if already exists.
+**Retrieval** — an ablation grid run through the *real* retriever internals, scored
+against a 27-question hand-labeled gold set (recall@k, MRR, nDCG@k). This is the table
+that justifies the pipeline: it shows what BM25, RRF, metadata filters, multi-query
+rewrite, and rerank each contribute over a semantic-only baseline.
 
-3. **Single-turn Q&A only**: The `/ask` endpoint takes a single query; there is no conversation memory. Future: pass prior turns to Claude for multi-turn dialogue.
+**Generation** — the full `/ask` pipeline per question, graded by an **independent**
+LLM judge (a different, stronger model than the generator, to avoid self-consistency
+bias) on faithfulness, citation accuracy, and answer relevance, plus a groundedness
+pass-rate. Per-question judge **rationales** are persisted for inspection.
 
-4. **IVFFlat requires data to build index**: The `ivfflat` index is created at schema init with `lists=100` but performs poorly until ~10,000 vectors are inserted. For small datasets, a sequential scan is automatically used.
+Results below are from the official run (`claude-sonnet-5` generation, `claude-opus-4-8`
+judge, production Cohere key):
 
-5. **SEC EDGAR rate limits**: `load_urls()` fetches pages sequentially. Bulk EDGAR crawling should use their official bulk data download API to avoid rate limiting.
+**Retrieval ablation** — _pending official run_
 
-6. **No authentication on API**: The FastAPI routes have no auth. For deployment, add OAuth2 or API key middleware.
+| variant | recall@5 | recall@10 | nDCG@10 | MRR | hit_rate@10 |
+|---|---|---|---|---|---|
+| semantic_only | _—_ | _—_ | _—_ | _—_ | _—_ |
+| bm25_only | _—_ | _—_ | _—_ | _—_ | _—_ |
+| hybrid | _—_ | _—_ | _—_ | _—_ | _—_ |
+| hybrid_filters | _—_ | _—_ | _—_ | _—_ | _—_ |
+| hybrid_multiquery | _—_ | _—_ | _—_ | _—_ | _—_ |
+| hybrid_multiquery_rerank | _—_ | _—_ | _—_ | _—_ | _—_ |
+
+**Generation (LLM-as-judge, 1–5)** — _pending official run_
+
+| faithfulness | citation_accuracy | answer_relevance | groundedness_rate |
+|---|---|---|---|
+| _—_ | _—_ | _—_ | _—_ |
+
+> Judge scores are directional (they compare configs and catch regressions), not a
+> certified accuracy number. Reports auto-flag score-distorting artifacts (e.g. Cohere
+> trial-key rate-limiting) as `caveats`.
+
+```bash
+python -m evals.run --suite retrieval
+python -m evals.run --suite generation --concurrency 2 --pace 2
+```
+
+---
+
+## Design decisions
+
+- **Explicit stages, not LangChain chains.** Built-in chains hide the rerank step and
+  make injecting Cohere between retrieval and generation awkward. Explicit
+  `retriever → reranker → generator` keeps each stage testable and swappable.
+- **Hybrid + RRF over pure vector search.** Dense search misses exact-term queries
+  (ticker symbols, GAAP line items) that BM25 nails; RRF fuses both rankings without
+  tuning score scales.
+- **Table-aware PDF extraction.** Plain text extractors flatten a financial table
+  into number-soup that loses which figure belongs to which column/year. `pdfplumber`
+  recovers the grid; each table is rendered as a Markdown pipe table and emitted as
+  its **own** chunk (so the splitter never breaks it mid-grid) with its cells removed
+  from the page's narrative text (so figures aren't double-counted). Falls back to
+  plain text per-page, then to `pypdf`, so a filing never fails to ingest.
+- **Reranking is never optional.** If Cohere fails, retrieval falls back to a
+  cosine-calibrated similarity gate (a separate threshold, since cosine and Cohere
+  scores are distributed differently) — it never silently skips the relevance check.
+- **Relevance gate at 0.3.** Below it, the app returns "I don't have enough
+  information" instead of generating from weak context — essential for financial Q&A.
+- **Content-hash dedup.** Re-ingesting shared/boilerplate text never re-pays for
+  embeddings; provenance for every filing/page is accumulated in a `sources` JSONB
+  array that also drives metadata filtering.
+- **Config as the model-swap interface.** Dev uses cost-conscious models; the official
+  benchmark overrides `GENERATION_MODEL`/`JUDGE_MODEL` via env only.
+
+---
+
+## Production notes
+
+Things a real deployment would add, and where they'd go — deliberately out of scope
+for a single-tenant portfolio demo:
+
+- **Rate limiting** belongs at the API gateway / ingress, not a per-process in-memory
+  limiter (which protects nothing behind a load balancer). The upstream LLM/rerank
+  providers are the real scarce resource and are already timeout- and retry-guarded.
+- **Observability**: JSON logs with request-id correlation are in place; a deployment
+  would ship them to a log aggregator and add OpenTelemetry traces + a metrics endpoint.
+- **Schema migrations**: the schema is one `init.sql`; a migration story (Alembic)
+  would come with the first breaking schema change.
+- **Auth**: `X-API-Key` fits single-tenant; multi-tenant would warrant OAuth2/JWT.
+
+---
+
+## Repository layout
+
+```
+api/         FastAPI app, routes, middleware (request-id, auth)
+core/        config (pydantic-settings), shared API clients, logging
+ingest/      loader · metadata · chunker · embedder
+retrieval/   retriever (hybrid + RRF) · reranker (Cohere + fallback)
+generation/  prompts · query_rewriter · generator (+ streaming)
+evals/       metrics · variants · judge · retrieval/generation suites · report · run
+ui/          Streamlit chat app (SSE consumer)
+tests/       105 tests, fully mocked (no live DB/API)
+```
+
+## Stack
+
+Python 3.11 · FastAPI · asyncpg · ParadeDB (Postgres 16 + pgvector + pg_search) ·
+OpenAI `text-embedding-3-small` · Claude (generation, rewrite, judge) · Cohere Rerank ·
+Streamlit · pytest / ruff / mypy · Docker Compose.

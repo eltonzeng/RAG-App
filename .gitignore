@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+
+# Secrets & env
+.env
+
+# Eval outputs (generated per run)
+evals/reports/
+
+# Ingested filings (large binaries — fetch from EDGAR, don't commit)
+filings/
+
+# OS
+.DS_Store

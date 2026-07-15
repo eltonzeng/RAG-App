@@ -63,9 +63,7 @@ def _embeddings_client(dim: int = 1536) -> MagicMock:
 class TestContentHash:
     def test_whitespace_normalized(self) -> None:
         """Trivial whitespace differences hash identically."""
-        assert _content_hash("Total  revenue\n was $5B") == _content_hash(
-            "Total revenue was $5B"
-        )
+        assert _content_hash("Total  revenue\n was $5B") == _content_hash("Total revenue was $5B")
 
     def test_distinct_content_differs(self) -> None:
         assert _content_hash("revenue") != _content_hash("expenses")
@@ -77,8 +75,10 @@ class TestSourceHelpers:
         chunk = make_chunk("x", page_number=3, ticker="AAPL")
         elem = _source_element(chunk)
         assert elem == {
-            "source_filename": "test.pdf", "page_number": 3,
-            "chunk_index": 0, "ticker": "AAPL",
+            "source_filename": "test.pdf",
+            "page_number": 3,
+            "chunk_index": 0,
+            "ticker": "AAPL",
         }
         assert "quarter" not in elem
 
@@ -104,7 +104,7 @@ class TestEmbedAndStore:
         pool = _FakePool(conn)
         chunks = [make_chunk("alpha", page_number=1), make_chunk("beta", page_number=2)]
 
-        with patch("ingest.embedder.AsyncOpenAI", return_value=_embeddings_client()):
+        with patch("ingest.embedder.get_openai_client", return_value=_embeddings_client()):
             embedded, skipped = await embed_and_store(chunks, pool)
 
         assert (embedded, skipped) == (2, 0)
@@ -120,7 +120,7 @@ class TestEmbedAndStore:
         chunks = [make_chunk("alpha", page_number=1), make_chunk("beta", page_number=2)]
 
         client = _embeddings_client()
-        with patch("ingest.embedder.AsyncOpenAI", return_value=client):
+        with patch("ingest.embedder.get_openai_client", return_value=client):
             embedded, skipped = await embed_and_store(chunks, pool)
 
         assert (embedded, skipped) == (1, 1)
@@ -143,7 +143,7 @@ class TestEmbedAndStore:
         ]
 
         client = _embeddings_client()
-        with patch("ingest.embedder.AsyncOpenAI", return_value=client):
+        with patch("ingest.embedder.get_openai_client", return_value=client):
             embedded, skipped = await embed_and_store(chunks, pool)
 
         assert (embedded, skipped) == (1, 0)

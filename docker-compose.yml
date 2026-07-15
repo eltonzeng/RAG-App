@@ -1,22 +1,66 @@
 services:
   postgres:
     # ParadeDB ships pg_search (true BM25) alongside pgvector, so both semantic
-    # and lexical search run in-database.
-    # TODO: pin to a specific verified tag (e.g. paradedb/paradedb:0.15.x) for
-    # reproducibility once confirmed against the registry.
-    image: paradedb/paradedb:latest
+    # and lexical search run in-database. Pinned to a PG16 tag: :latest now
+    # resolves to a PG18 image whose data-directory layout is incompatible
+    # with this compose file's volume mount.
+    image: paradedb/paradedb:0.24.1-pg16
     environment:
       POSTGRES_USER: raguser
       POSTGRES_PASSWORD: ragpass
       POSTGRES_DB: ragdb
     ports:
-      - "5432:5432"
+      # Host 5434 -> container 5432. 5432 is taken by a local Postgres.app
+      # instance and 5433 by another project's container on this machine;
+      # the container's internal port is unaffected.
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U raguser -d ragdb"]
       interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    image: sec-rag:latest
+    # Secrets (OPENAI/ANTHROPIC/COHERE keys) come from .env; DATABASE_URL below
+    # overrides the .env value to reach postgres over the compose network.
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://raguser:ragpass@postgres:5432/ragdb
+      LOG_FORMAT: json
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ui:
+    # Reuses the api image; only the command differs.
+    image: sec-rag:latest
+    command: streamlit run ui/app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      RAG_API_BASE_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"
+      interval: 10s
       timeout: 5s
       retries: 5
 

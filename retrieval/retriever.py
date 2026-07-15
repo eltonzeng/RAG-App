@@ -16,13 +16,13 @@ import logging
 import time
 
 import asyncpg
-from openai import AsyncOpenAI
 
 from api.models import Chunk, ScoredChunk
+from core.clients import get_openai_client
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "text-embedding-3-small"
 RRF_K = 60  # RRF damping constant; standard default.
 # Per-branch candidate pool. Widened beyond top_k so fusion has material to work
 # with before the final trim.
@@ -73,7 +73,8 @@ async def _search_semantic(
             ORDER BY embedding <=> $1::vector
             LIMIT $2
             """,
-            embedding, limit,
+            embedding,
+            limit,
         )
     return await conn.fetch(
         """
@@ -84,7 +85,9 @@ async def _search_semantic(
         ORDER BY embedding <=> $1::vector
         LIMIT $3
         """,
-        embedding, filter_json, limit,
+        embedding,
+        filter_json,
+        limit,
     )
 
 
@@ -110,7 +113,9 @@ async def _search_bm25(
             ORDER BY paradedb.score(id) DESC
             LIMIT $3
             """,
-            query, embedding, limit,
+            query,
+            embedding,
+            limit,
         )
     return await conn.fetch(
         """
@@ -122,7 +127,10 @@ async def _search_bm25(
         ORDER BY paradedb.score(id) DESC
         LIMIT $4
         """,
-        query, embedding, filter_json, limit,
+        query,
+        embedding,
+        filter_json,
+        limit,
     )
 
 
@@ -184,9 +192,11 @@ async def hybrid_retrieve(
     filter_json = json.dumps([filters]) if filters else None
 
     # Embed every query variant in a single OpenAI call.
-    client = AsyncOpenAI()
+    client = get_openai_client()
     try:
-        response = await client.embeddings.create(model=EMBEDDING_MODEL, input=queries)
+        response = await client.embeddings.create(
+            model=get_settings().embedding_model, input=queries
+        )
         embeddings = [item.embedding for item in response.data]
     except Exception as e:
         logger.error("Failed to embed query variants: %s", e)
@@ -194,42 +204,73 @@ async def hybrid_retrieve(
 
     branch_limit = max(top_k * BRANCH_LIMIT_MULTIPLIER, top_k)
 
-    async def _run_variant(query: str, embedding: list[float]) -> list[list[asyncpg.Record]]:
-        async with db_pool.acquire() as conn:
-            semantic = await _search_semantic(conn, embedding, filter_json, branch_limit)
-            bm25 = await _search_bm25(conn, query, embedding, filter_json, branch_limit)
-        return [semantic, bm25]
+    async def _fuse(fj: str | None) -> tuple[list[ScoredChunk], int]:
+        """Run both branches for every query under filter `fj` and fuse via RRF.
+
+        Returns the fused ScoredChunks and the number of unique chunks seen.
+        """
+
+        async def _run_variant(query: str, embedding: list[float]) -> list[list[asyncpg.Record]]:
+            async with db_pool.acquire() as conn:
+                semantic = await _search_semantic(conn, embedding, fj, branch_limit)
+                bm25 = await _search_bm25(conn, query, embedding, fj, branch_limit)
+            return [semantic, bm25]
+
+        per_variant = await asyncio.gather(
+            *(_run_variant(q, emb) for q, emb in zip(queries, embeddings, strict=True))
+        )
+
+        # Collect every branch's ranked ID list and a unified chunk map (keeping
+        # the highest cosine similarity seen for each chunk).
+        chunk_map: dict[str, ScoredChunk] = {}
+        ranked_lists: list[list[str]] = []
+        for branches in per_variant:
+            for rows in branches:
+                ranked_ids: list[str] = []
+                for row in rows:
+                    sc = _row_to_scored_chunk(row)
+                    ranked_ids.append(sc.chunk.id)
+                    existing = chunk_map.get(sc.chunk.id)
+                    if existing is None or sc.score > existing.score:
+                        chunk_map[sc.chunk.id] = sc
+                ranked_lists.append(ranked_ids)
+        return _rrf_fuse(ranked_lists, chunk_map, top_k), len(chunk_map)
 
     try:
-        per_variant = await asyncio.gather(
-            *(_run_variant(q, emb) for q, emb in zip(queries, embeddings))
-        )
+        fused, unique = await _fuse(filter_json)
     except Exception as e:
         logger.error("Hybrid retrieval database queries failed: %s", e)
         raise
 
-    # Collect every branch's ranked ID list and a unified chunk map (keeping the
-    # highest cosine similarity seen for each chunk).
-    chunk_map: dict[str, ScoredChunk] = {}
-    ranked_lists: list[list[str]] = []
-    for branches in per_variant:
-        for rows in branches:
-            ranked_ids: list[str] = []
-            for row in rows:
-                sc = _row_to_scored_chunk(row)
-                ranked_ids.append(sc.chunk.id)
-                existing = chunk_map.get(sc.chunk.id)
-                if existing is None or sc.score > existing.score:
-                    chunk_map[sc.chunk.id] = sc
-            ranked_lists.append(ranked_ids)
-
-    fused = _rrf_fuse(ranked_lists, chunk_map, top_k)
+    # Zero-result fallback. An over-restrictive or wrong metadata filter — e.g. a
+    # ticker hallucinated by the rewrite step (AAOI → "AOEO") — can match no
+    # chunks via JSONB containment, zeroing out retrieval. Rather than return
+    # nothing, retry unfiltered so the user still gets an answer (degraded, and
+    # logged) instead of a false "no relevant content".
+    used_fallback = False
+    if not fused and filter_json is not None:
+        logger.warning(
+            "Filtered retrieval returned 0 results (filters=%s); retrying unfiltered",
+            filters,
+        )
+        try:
+            fused, unique = await _fuse(None)
+            used_fallback = True
+        except Exception as e:
+            logger.error("Unfiltered fallback retrieval failed: %s", e)
+            raise
 
     elapsed = time.perf_counter() - start_time
     logger.info(
         "Hybrid retrieve: %d variants × 2 branches → %d unique → %d fused "
-        "(top_k=%d, filters=%s) in %.3fs — top cosine: %.4f",
-        len(queries), len(chunk_map), len(fused), top_k, filters or "none", elapsed,
+        "(top_k=%d, filters=%s, fallback=%s) in %.3fs — top cosine: %.4f",
+        len(queries),
+        unique,
+        len(fused),
+        top_k,
+        filters or "none",
+        used_fallback,
+        elapsed,
         fused[0].score if fused else 0.0,
     )
     return fused

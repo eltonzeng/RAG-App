@@ -23,9 +23,7 @@ _CONTENT_SCAN_CHARS = 4000
 # 10-K / 10-Q (and amendments like 10-K/A). Normalized to upper case. Uses
 # explicit non-alphanumeric boundaries because filenames often use underscores
 # (e.g. "AAPL_10-K_2023.pdf"), where \b does not match between "_" and "1".
-_FORM_TYPE_RE = re.compile(
-    r"(?<![0-9A-Za-z])(10[\-\s]?[KQ])(?:/A)?(?![A-Za-z])", re.IGNORECASE
-)
+_FORM_TYPE_RE = re.compile(r"(?<![0-9A-Za-z])(10[\-\s]?[KQ])(?:/A)?(?![A-Za-z])", re.IGNORECASE)
 # Four-digit fiscal years in a plausible range. Digit-boundary lookarounds
 # (rather than \b) so years adjacent to "_" or letters in filenames still match.
 _YEAR_RE = re.compile(r"(?<!\d)(19[9]\d|20[0-4]\d)(?!\d)")
@@ -36,15 +34,11 @@ _FY_PHRASE_RE = re.compile(
 )
 # Quarter cues: "Q3", "third quarter", "quarterly period ended ... (Q2)".
 _QUARTER_RE = re.compile(r"\bQ([1-4])\b", re.IGNORECASE)
-_QUARTER_WORD_RE = re.compile(
-    r"\b(first|second|third|fourth)\s+quarter\b", re.IGNORECASE
-)
+_QUARTER_WORD_RE = re.compile(r"\b(first|second|third|fourth)\s+quarter\b", re.IGNORECASE)
 # Ticker in a filename like "AAPL_10-K_2023.pdf" or "aapl-10q.pdf".
 _FILENAME_TICKER_RE = re.compile(r"\b([A-Z]{1,5})[\-_]?(?:10[\-]?[KQ])", re.IGNORECASE)
 # Ticker in content, e.g. "(NASDAQ: AAPL)" or "Symbol: AAPL".
-_CONTENT_TICKER_RE = re.compile(
-    r"(?:NYSE|NASDAQ|symbol|ticker)[:\s]+([A-Z]{1,5})\b"
-)
+_CONTENT_TICKER_RE = re.compile(r"(?:NYSE|NASDAQ|symbol|ticker)[:\s]+([A-Z]{1,5})\b")
 
 _WORD_TO_QUARTER = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
@@ -87,20 +81,29 @@ def extract_filing_metadata(doc: Document) -> dict:
     if form_match:
         result["form_type"] = _normalize_form_type(form_match.group(1))
 
-    # Prefer explicit fiscal-year phrasing; fall back to filename year, then any
-    # plausible year in the content head.
-    fy_match = _FY_PHRASE_RE.search(head)
-    year_match = fy_match or _YEAR_RE.search(filename) or _YEAR_RE.search(head)
+    # Prefer the filename year: each PDF page is ingested as its own Document, so
+    # an in-content "fiscal year" phrase is per-page and unreliable — MD&A pages
+    # routinely reference prior years in comparisons (e.g. "grew from fiscal year
+    # 2023 levels"), which would mislabel that page with the wrong filing year.
+    # The filename year is stable across every page of the same filing. Fall back
+    # to the explicit phrase, then any plausible year in the content, only when
+    # the filename itself carries no year.
+    year_match = _YEAR_RE.search(filename) or _FY_PHRASE_RE.search(head) or _YEAR_RE.search(head)
     if year_match:
         result["fiscal_year"] = int(year_match.group(1))
 
-    quarter_match = _QUARTER_RE.search(haystack)
-    if quarter_match:
-        result["quarter"] = int(quarter_match.group(1))
-    else:
-        word_match = _QUARTER_WORD_RE.search(head)
-        if word_match:
-            result["quarter"] = _WORD_TO_QUARTER[word_match.group(1).lower()]
+    # A 10-K is an annual filing with no quarter. Skip quarter extraction for it
+    # so incidental phrasing like "first quarter of fiscal 2025" in the MD&A does
+    # not mislabel the whole filing as Q1 (which would corrupt its provenance and
+    # any later quarter filter). Only 10-Q / unknown-form filings carry a quarter.
+    if result.get("form_type") != "10-K":
+        quarter_match = _QUARTER_RE.search(haystack)
+        if quarter_match:
+            result["quarter"] = int(quarter_match.group(1))
+        else:
+            word_match = _QUARTER_WORD_RE.search(head)
+            if word_match:
+                result["quarter"] = _WORD_TO_QUARTER[word_match.group(1).lower()]
 
     ticker_match = _FILENAME_TICKER_RE.search(filename) or _CONTENT_TICKER_RE.search(head)
     if ticker_match:

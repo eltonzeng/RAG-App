@@ -37,21 +37,49 @@ with source filenames and page numbers where available."""
 
 NO_RELEVANT_CONTENT_RESPONSE = (
     "I don't have enough information in the provided filings to answer this question. "
-    "The documents currently ingested do not appear to contain relevant content for your query. "
-    "Please try rephrasing your question or ingest additional SEC filings that may cover this topic."
+    "The documents currently ingested do not appear to contain relevant content for "
+    "your query. Please try rephrasing your question or ingest additional SEC filings "
+    "that may cover this topic."
 )
 
 
-def build_context_block(chunks: list) -> str:
+def relevant_sources(sources: list[dict], filters: dict | None) -> list[dict]:
+    """Keep only the provenance entries that satisfy the applied metadata filters.
+
+    A deduplicated chunk can carry sources from several filings/years. When a
+    metadata filter was applied at retrieval time (e.g. ``{"ticker": "MU"}``),
+    only the sources matching that filter are germane to the answer — surfacing
+    the others would cite/quote filings the user filtered out. With no filter,
+    every source is relevant.
+
+    Args:
+        sources: The chunk's ``metadata["sources"]`` list.
+        filters: The applied containment filters (empty/None means no filter).
+
+    Returns:
+        The subset of sources matching every filter key/value. Falls back to all
+        sources when the filter matches none — retrieval guarantees at least one
+        match, so this only guards against unexpected states.
+    """
+    if not filters:
+        return list(sources)
+    matching = [src for src in sources if all(src.get(k) == v for k, v in filters.items())]
+    return matching or list(sources)
+
+
+def build_context_block(chunks: list, filters: dict | None = None) -> str:
     """Format a list of ScoredChunk objects into a numbered context block.
 
     Args:
         chunks: List of ScoredChunk objects to format.
+        filters: Metadata filters applied at retrieval time. When set, a
+            deduplicated chunk's sources are narrowed to those matching the
+            filter so the excerpt is not labeled with filtered-out filings.
 
     Returns:
         Formatted string with numbered excerpts and source citations. When a
-        deduplicated chunk appears in multiple filings, all of its sources are
-        listed.
+        deduplicated chunk appears in multiple (filter-matching) filings, all of
+        those sources are listed.
     """
     parts: list[str] = []
     for i, scored_chunk in enumerate(chunks, start=1):
@@ -59,7 +87,7 @@ def build_context_block(chunks: list) -> str:
         sources = chunk.metadata.get("sources")
         if sources:
             labels = []
-            for src in sources:
+            for src in relevant_sources(sources, filters):
                 name = src.get("source_filename", "Unknown source")
                 page = src.get("page_number")
                 labels.append(f"{name}, page {page}" if page else name)

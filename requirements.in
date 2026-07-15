@@ -1,0 +1,34 @@
+# Runtime dependencies (loose intent; pinned versions live in requirements.txt,
+# generated via `pip-compile requirements.in`).
+
+# Core framework
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0
+pydantic-settings>=2.0
+python-dotenv>=1.0.0
+
+# RAG pipeline (only the text splitter is used; full langchain/-community pruned)
+langchain-text-splitters>=0.2.0
+
+# Embeddings & LLM
+openai>=1.30.0
+anthropic>=0.30.0
+
+# Reranking
+cohere>=5.0
+
+# Vector store
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+pgvector>=0.3.0
+
+# Document processing
+pdfplumber>=0.11          # table-aware PDF extraction (primary)
+pypdf>=4.0                # plain-text fallback when pdfplumber can't open a file
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+tiktoken>=0.7.0
+
+# UI
+streamlit>=1.35.0
