@@ -75,8 +75,8 @@ async def evaluate_variant(
     dataset: list[dict],
     db_pool: asyncpg.Pool,
     top_k: int = TOP_K,
-) -> dict[str, float]:
-    """Run a variant over the dataset and return mean metrics.
+) -> tuple[dict[str, float], list[dict]]:
+    """Run a variant over the dataset, returning mean metrics and per-question rows.
 
     Args:
         variant: The retrieval configuration.
@@ -85,12 +85,14 @@ async def evaluate_variant(
         top_k: Retrieval cutoff.
 
     Returns:
-        Dict of metric name → mean value across queries.
+        Tuple of (mean metrics dict, per-question rows). Each row carries the
+        question id and its individual metric values.
     """
     totals = _blank_scores()
+    rows: list[dict] = []
     n = len(dataset)
     if n == 0:
-        return totals
+        return totals, rows
 
     for row in dataset:
         gold = metrics.gold_keys(row.get("gold", []))
@@ -98,13 +100,24 @@ async def evaluate_variant(
             variant, row["question"], row.get("filters", {}), db_pool, top_k=top_k
         )
         retrieved = _to_retrieved(scored)
+        per_q: dict[str, object] = {"id": row.get("id"), "question": row["question"]}
         for k in RECALL_KS:
-            totals[f"recall@{k}"] += metrics.recall_at_k(retrieved, gold, k)
-        totals[f"ndcg@{NDCG_K}"] += metrics.ndcg_at_k(retrieved, gold, NDCG_K)
-        totals["mrr"] += metrics.mrr(retrieved, gold)
-        totals[f"hit_rate@{RECALL_KS[-1]}"] += metrics.hit_rate_at_k(retrieved, gold, RECALL_KS[-1])
+            value = metrics.recall_at_k(retrieved, gold, k)
+            totals[f"recall@{k}"] += value
+            per_q[f"recall@{k}"] = value
+        ndcg = metrics.ndcg_at_k(retrieved, gold, NDCG_K)
+        mrr = metrics.mrr(retrieved, gold)
+        hit = metrics.hit_rate_at_k(retrieved, gold, RECALL_KS[-1])
+        totals[f"ndcg@{NDCG_K}"] += ndcg
+        totals["mrr"] += mrr
+        totals[f"hit_rate@{RECALL_KS[-1]}"] += hit
+        per_q[f"ndcg@{NDCG_K}"] = ndcg
+        per_q["mrr"] = mrr
+        per_q[f"hit_rate@{RECALL_KS[-1]}"] = hit
+        rows.append(per_q)
 
-    return {name: value / n for name, value in totals.items()}
+    means = {name: value / n for name, value in totals.items()}
+    return means, rows
 
 
 async def run_retrieval_eval(
@@ -112,7 +125,7 @@ async def run_retrieval_eval(
     variant_names: list[str] | None = None,
     dataset_path: Path = DATASET_PATH,
     limit: int | None = None,
-) -> dict[str, dict[str, float]]:
+) -> dict:
     """Evaluate the requested variants over the dataset.
 
     Args:
@@ -122,7 +135,8 @@ async def run_retrieval_eval(
         limit: If set, evaluate only the first N dataset rows (smoke testing).
 
     Returns:
-        Mapping of variant name → metrics dict.
+        Dict with "aggregates" (variant → mean metrics), "rows" (variant →
+        per-question rows), and "caveats".
     """
     dataset = load_dataset(dataset_path)
     if limit is not None:
@@ -130,9 +144,11 @@ async def run_retrieval_eval(
     logger.info("Loaded %d gold questions from %s", len(dataset), dataset_path)
 
     names = variant_names or list(VARIANTS)
-    results: dict[str, dict[str, float]] = {}
+    aggregates: dict[str, dict[str, float]] = {}
+    rows: dict[str, list[dict]] = {}
     for name in names:
         variant = VARIANTS[name]
         logger.info("Evaluating variant '%s'", name)
-        results[name] = await evaluate_variant(variant, dataset, db_pool)
-    return results
+        aggregates[name], rows[name] = await evaluate_variant(variant, dataset, db_pool)
+
+    return {"aggregates": aggregates, "rows": rows, "caveats": []}

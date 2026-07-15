@@ -154,6 +154,6 @@ async def run_variant(
         # Rerank the entire fused set (top_n = len) so the returned list is the
         # full top_k reordered, not truncated to a production top_n. This keeps
         # recall@k / nDCG@k comparable with the non-rerank variants.
-        fused, _ = await rerank(question, fused, top_n=len(fused))
+        fused, _, _ = await rerank(question, fused, top_n=len(fused))
 
     return fused

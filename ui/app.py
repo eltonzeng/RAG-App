@@ -4,8 +4,10 @@ Provides a chat UI with collapsible citation cards, sidebar stats,
 and document ingestion directly from the UI.
 """
 
+import json
 import logging
 import os
+from collections.abc import Iterator
 
 import requests
 import streamlit as st
@@ -23,6 +25,70 @@ def _render_citation(citation: dict) -> None:
     page_str = f" — page {citation['page']}" if citation.get("page") else ""
     chunk_id = citation["chunk_id"][:8]
     st.markdown(f"- **{citation['source']}**{page_str} `id:{chunk_id}`")
+
+
+def _stream_answer(prompt: str, sink: dict) -> Iterator[str]:
+    """Yield answer text deltas from /ask/stream, recording metadata in ``sink``.
+
+    Parses the Server-Sent Events frames: ``delta`` frames are yielded (for
+    st.write_stream); ``citations`` and ``done`` payloads are stored in ``sink``
+    for the caller to render after the stream completes. An ``error`` frame
+    raises so the caller can fall back to the blocking endpoint.
+    """
+    with requests.post(
+        f"{API_BASE_URL}/ask/stream",
+        json={"query": prompt},
+        stream=True,
+        timeout=120,
+    ) as resp:
+        resp.raise_for_status()
+        event = None
+        for line in resp.iter_lines(decode_unicode=True):
+            if not line:
+                continue
+            if line.startswith("event:"):
+                event = line[len("event:") :].strip()
+            elif line.startswith("data:"):
+                payload = json.loads(line[len("data:") :].strip())
+                if event == "delta":
+                    yield payload["text"]
+                elif event == "citations":
+                    sink["citations"] = payload
+                elif event == "done":
+                    sink["done"] = payload
+                elif event == "error":
+                    raise RuntimeError(payload.get("detail", "stream error"))
+
+
+def _finalize_turn(
+    answer: str,
+    citations: list,
+    latency_ms: float,
+    chunks_retrieved: int,
+    chunks_used: int,
+) -> None:
+    """Render citations + latency caption and append the turn to chat history."""
+    if citations:
+        with st.expander(f"Sources ({len(citations)} cited)"):
+            for citation in citations:
+                _render_citation(citation)
+
+    st.caption(
+        f"Latency: {latency_ms:.0f} ms | Retrieved: {chunks_retrieved} | Used: {chunks_used}"
+    )
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer,
+            "citations": citations,
+            "latency_ms": latency_ms,
+            "chunks_retrieved": chunks_retrieved,
+            "chunks_used": chunks_used,
+        }
+    )
+    st.session_state.last_latency_ms = latency_ms
+    st.session_state.total_queries += 1
 
 
 # ── Page config ──────────────────────────────────────────────────────────────
@@ -161,56 +227,41 @@ if prompt := st.chat_input("What was Apple's revenue in FY2023?"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Call API
-    with st.chat_message("assistant"), st.spinner("Thinking..."):
+    # Call API — stream tokens live, falling back to the blocking endpoint.
+    with st.chat_message("assistant"):
         try:
-            resp = requests.post(
-                f"{API_BASE_URL}/ask",
-                json={"query": prompt},
-                timeout=60,
+            sink: dict = {}
+            answer = st.write_stream(_stream_answer(prompt, sink))
+            done = sink.get("done", {})
+            _finalize_turn(
+                answer,
+                sink.get("citations", []),
+                done.get("latency_ms", 0),
+                done.get("chunks_retrieved", 0),
+                done.get("chunks_used", 0),
             )
-            if resp.status_code == 200:
-                data = resp.json()
-                answer = data["answer"]
-                citations = data.get("citations", [])
-                latency_ms = data.get("latency_ms", 0)
-                chunks_retrieved = data.get("chunks_retrieved", 0)
-                chunks_used = data.get("chunks_used", 0)
-
-                st.markdown(answer)
-
-                if citations:
-                    with st.expander(f"Sources ({len(citations)} cited)"):
-                        for citation in citations:
-                            _render_citation(citation)
-
-                st.caption(
-                    f"Latency: {latency_ms:.0f} ms | "
-                    f"Retrieved: {chunks_retrieved} | Used: {chunks_used}"
-                )
-
-                # Store in history
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": answer,
-                        "citations": citations,
-                        "latency_ms": latency_ms,
-                        "chunks_retrieved": chunks_retrieved,
-                        "chunks_used": chunks_used,
-                    }
-                )
-                st.session_state.last_latency_ms = latency_ms
-                st.session_state.total_queries += 1
-
-            elif resp.status_code == 503:
-                st.error("A backend service is unavailable. Check API logs.")
-            else:
-                detail = resp.json().get("detail", "Unknown error")
-                st.error(f"Error {resp.status_code}: {detail}")
-
         except requests.exceptions.ConnectionError:
             st.error("Cannot connect to API. Run: `uvicorn api.main:app --reload`")
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            logger.error("UI error: %s", e)
+        except Exception as stream_err:
+            # Streaming failed — fall back to the non-streaming /ask endpoint.
+            logger.warning("Stream failed (%s); falling back to /ask", stream_err)
+            try:
+                resp = requests.post(f"{API_BASE_URL}/ask", json={"query": prompt}, timeout=60)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    st.markdown(data["answer"])
+                    _finalize_turn(
+                        data["answer"],
+                        data.get("citations", []),
+                        data.get("latency_ms", 0),
+                        data.get("chunks_retrieved", 0),
+                        data.get("chunks_used", 0),
+                    )
+                elif resp.status_code == 503:
+                    st.error("A backend service is unavailable. Check API logs.")
+                else:
+                    detail = resp.json().get("detail", "Unknown error")
+                    st.error(f"Error {resp.status_code}: {detail}")
+            except Exception as e:
+                st.error(f"Unexpected error: {e}")
+                logger.error("UI error: %s", e)

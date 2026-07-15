@@ -28,7 +28,7 @@ async def rerank(
     query: str,
     scored_chunks: list[ScoredChunk],
     top_n: int = 5,
-) -> tuple[list[ScoredChunk], bool]:
+) -> tuple[list[ScoredChunk], bool, bool]:
     """Rerank retrieved chunks using the Cohere Rerank API.
 
     If all reranked scores fall below RELEVANCE_THRESHOLD, the second
@@ -44,10 +44,12 @@ async def rerank(
         Tuple of:
           - List of reranked ScoredChunk objects (length <= top_n)
           - Boolean: True if content is relevant, False if below threshold
+          - Boolean: True if the Cohere call failed and the similarity fallback
+            was used (surfaced so eval reports can flag rate-limit artifacts)
     """
     if not scored_chunks:
         logger.warning("rerank called with empty chunk list")
-        return [], False
+        return [], False, False
 
     start_time = time.perf_counter()
     documents = [sc.chunk.content for sc in scored_chunks]
@@ -95,7 +97,7 @@ async def rerank(
                 RELEVANCE_THRESHOLD,
             )
 
-        return reranked, is_relevant
+        return reranked, is_relevant, False
 
     except Exception as e:
         logger.warning("Cohere rerank failed, falling back to similarity top-%d: %s", top_n, e)
@@ -114,4 +116,4 @@ async def rerank(
             FALLBACK_SIMILARITY_THRESHOLD,
             is_relevant,
         )
-        return fallback, is_relevant
+        return fallback, is_relevant, True

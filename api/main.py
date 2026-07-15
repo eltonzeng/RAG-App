@@ -8,15 +8,16 @@ import logging
 from contextlib import asynccontextmanager
 
 import asyncpg
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from api.middleware import RequestIdMiddleware
 from api.routes import router
 from core.config import get_settings
+from core.logging import configure_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
-)
+configure_logging(get_settings().log_format)
 logger = logging.getLogger(__name__)
 
 
@@ -102,5 +103,30 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Correlation IDs first (inner), so CORS wraps it on the response.
+app.add_middleware(RequestIdMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origin_list,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Backstop: never leak a stack trace; return a correlated JSON 500.
+
+    Route handlers still map their known failures to specific HTTP errors; this
+    only catches genuinely unexpected exceptions.
+    """
+    request_id = getattr(request.state, "request_id", "")
+    logger.exception("Unhandled error processing %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "request_id": request_id},
+    )
+
 
 app.include_router(router)

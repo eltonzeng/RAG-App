@@ -50,10 +50,13 @@ class TestReranker:
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank("SEC filings query", chunks, top_n=5)
+            reranked, is_relevant, used_fallback = await rerank(
+                "SEC filings query", chunks, top_n=5
+            )
 
         assert len(reranked) <= 5
         assert is_relevant is True
+        assert used_fallback is False
 
     @pytest.mark.asyncio
     async def test_rerank_below_threshold_flags_irrelevant(self) -> None:
@@ -70,7 +73,7 @@ class TestReranker:
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank("SEC annual report revenue", chunks, top_n=1)
+            reranked, is_relevant, _ = await rerank("SEC annual report revenue", chunks, top_n=1)
 
         assert is_relevant is False
 
@@ -87,14 +90,14 @@ class TestReranker:
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank("annual report", chunks, top_n=1)
+            reranked, is_relevant, _ = await rerank("annual report", chunks, top_n=1)
 
         assert is_relevant is True
 
     @pytest.mark.asyncio
     async def test_rerank_empty_input(self) -> None:
         """Empty input should return empty list and False."""
-        reranked, is_relevant = await rerank("any query", [], top_n=5)
+        reranked, is_relevant, _ = await rerank("any query", [], top_n=5)
         assert reranked == []
         assert is_relevant is False
 
@@ -112,8 +115,9 @@ class TestReranker:
             mock_client.rerank = AsyncMock(side_effect=Exception("Cohere API unavailable"))
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank("query", chunks, top_n=2)
+            reranked, is_relevant, used_fallback = await rerank("query", chunks, top_n=2)
 
+        assert used_fallback is True
         assert len(reranked) == 2
         # Should be sorted by similarity score descending
         assert reranked[0].chunk.id == "id-1"
@@ -134,7 +138,7 @@ class TestReranker:
             mock_client.rerank = AsyncMock(side_effect=Exception("Cohere unavailable"))
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank("unrelated query", chunks, top_n=1)
+            reranked, is_relevant, _ = await rerank("unrelated query", chunks, top_n=1)
 
         assert is_relevant is False
 

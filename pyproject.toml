@@ -48,7 +48,6 @@ addopts = "--cov=api --cov=core --cov=retrieval --cov=generation --cov=ingest --
 
 [tool.coverage.report]
 # Regression floor, not an aspiration. The unit-testable core is well covered
-# (reranker/chunker 100%, metadata/query_rewriter 90%+); the eval harness and IO
-# loaders pull the aggregate down. Ratcheted up as suites are added (Phase 4
-# lifts eval coverage). Keep this just below the current measured total.
-fail_under = 55
+# (reranker/chunker 100%, metadata/query_rewriter 90%+); the IO loaders pull the
+# aggregate down. Kept just below the current measured total (~71%).
+fail_under = 68

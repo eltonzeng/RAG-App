@@ -6,6 +6,7 @@ and extracts structured citations from chunk metadata.
 
 import logging
 import time
+from collections.abc import AsyncIterator
 
 import anthropic
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 MAX_TOKENS = 1024
 
 
-def _extract_citations(
+def extract_citations(
     scored_chunks: list[ScoredChunk],
     filters: dict | None = None,
 ) -> list[Citation]:
@@ -71,19 +72,76 @@ def _extract_citations(
     return citations
 
 
+async def generate_stream(
+    query: str,
+    scored_chunks: list[ScoredChunk],
+    is_relevant: bool,
+    filters: dict | None = None,
+) -> AsyncIterator[str]:
+    """Stream the answer text token-by-token from Claude.
+
+    Yields incremental text deltas as they arrive. If no relevant content was
+    found (is_relevant=False), yields the graceful "not enough information"
+    message as a single delta and makes no API call. This is the single source
+    of generation logic; ``generate`` collects it for the non-streaming path.
+
+    Args:
+        query: The user's natural language question.
+        scored_chunks: Reranked chunks to use as context.
+        is_relevant: Whether any chunk exceeded the relevance threshold.
+        filters: Metadata filters applied at retrieval time (narrow the context
+            labels to the matching filings).
+
+    Yields:
+        Text deltas of the answer, in order.
+
+    Raises:
+        anthropic.APIError: If the Anthropic API call fails.
+    """
+    if not is_relevant or not scored_chunks:
+        logger.info("No relevant content found — returning graceful fallback response")
+        yield NO_RELEVANT_CONTENT_RESPONSE
+        return
+
+    start_time = time.perf_counter()
+    context_block = build_context_block(scored_chunks, filters)
+    user_message = USER_PROMPT_TEMPLATE.format(context=context_block, query=query)
+
+    client = get_anthropic_client()
+    char_count = 0
+
+    try:
+        async with client.messages.stream(
+            model=get_settings().generation_model,
+            max_tokens=MAX_TOKENS,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_message}],
+        ) as stream:
+            async for text in stream.text_stream:
+                char_count += len(text)
+                yield text
+    except anthropic.APIError as e:
+        logger.error("Anthropic API error during generation: %s", e)
+        raise
+
+    elapsed = time.perf_counter() - start_time
+    logger.info(
+        "Generation complete: %d chars in %.2fs using %d context chunks",
+        char_count,
+        elapsed,
+        len(scored_chunks),
+    )
+
+
 async def generate(
     query: str,
     scored_chunks: list[ScoredChunk],
     is_relevant: bool,
     filters: dict | None = None,
 ) -> tuple[str, list[Citation]]:
-    """Generate an answer from context chunks using Claude.
+    """Generate an answer and citations (non-streaming collector).
 
-    If no relevant content was found (is_relevant=False), returns a
-    graceful "not enough information" response without calling the API.
-
-    Streams the Anthropic response and collects it into a single string
-    for structured API return. SSE streaming is a planned future enhancement.
+    Collects ``generate_stream`` into a single string for the JSON /ask contract.
 
     Args:
         query: The user's natural language question.
@@ -94,48 +152,13 @@ async def generate(
             both the context labels and the emitted citations.
 
     Returns:
-        Tuple of (answer_text, citations).
+        Tuple of (answer_text, citations). Citations are empty when no relevant
+        content was found.
 
     Raises:
         anthropic.APIError: If the Anthropic API call fails.
     """
-    if not is_relevant or not scored_chunks:
-        logger.info("No relevant content found — returning graceful fallback response")
-        return NO_RELEVANT_CONTENT_RESPONSE, []
-
-    start_time = time.perf_counter()
-    context_block = build_context_block(scored_chunks, filters)
-    user_message = USER_PROMPT_TEMPLATE.format(
-        context=context_block,
-        query=query,
-    )
-
-    client = get_anthropic_client()
-    answer_parts: list[str] = []
-
-    try:
-        async with client.messages.stream(
-            model=get_settings().generation_model,
-            max_tokens=MAX_TOKENS,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-        ) as stream:
-            async for text in stream.text_stream:
-                answer_parts.append(text)
-
-        answer = "".join(answer_parts)
-        elapsed = time.perf_counter() - start_time
-
-        logger.info(
-            "Generation complete: %d chars in %.2fs using %d context chunks",
-            len(answer),
-            elapsed,
-            len(scored_chunks),
-        )
-
-    except anthropic.APIError as e:
-        logger.error("Anthropic API error during generation: %s", e)
-        raise
-
-    citations = _extract_citations(scored_chunks, filters)
+    parts = [text async for text in generate_stream(query, scored_chunks, is_relevant, filters)]
+    answer = "".join(parts)
+    citations = extract_citations(scored_chunks, filters) if (is_relevant and scored_chunks) else []
     return answer, citations

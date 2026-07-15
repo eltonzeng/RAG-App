@@ -4,10 +4,26 @@ Pure formatting — no dependency on tabulate or pandas.
 """
 
 import json
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
 REPORTS_DIR = Path(__file__).parent / "reports"
+
+
+def _git_commit() -> str | None:
+    """Return the short git commit hash, or None outside a git checkout."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=Path(__file__).parent,
+        )
+        return out.stdout.strip() or None
+    except Exception:
+        return None
 
 
 def _fmt(value: float) -> str:
@@ -44,12 +60,24 @@ def render_markdown_table(results: dict[str, dict[str, float]], row_label: str) 
     return "\n".join(lines)
 
 
-def write_json_report(suite: str, results: dict) -> Path:
+def write_json_report(
+    suite: str,
+    aggregates: dict,
+    rows: dict | list,
+    *,
+    models: dict[str, str],
+    run_config: dict,
+    caveats: list[str],
+) -> Path:
     """Write a timestamped JSON report and return its path.
 
     Args:
         suite: Suite name ("retrieval" or "generation").
-        results: The results payload to persist.
+        aggregates: Aggregate metrics (the summary table's data).
+        rows: Per-question detail (list for generation; variant→list for retrieval).
+        models: The exact model ids used, for reproducibility.
+        run_config: Run parameters (concurrency, pace, limit, variants).
+        caveats: Auto-generated caveats about score-distorting artifacts.
 
     Returns:
         Path to the written report.
@@ -60,7 +88,12 @@ def write_json_report(suite: str, results: dict) -> Path:
     payload = {
         "suite": suite,
         "generated_at": stamp,
-        "results": results,
+        "git_commit": _git_commit(),
+        "models": models,
+        "run_config": run_config,
+        "caveats": caveats,
+        "aggregates": aggregates,
+        "rows": rows,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path

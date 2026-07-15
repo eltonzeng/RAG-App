@@ -6,12 +6,15 @@ Routes:
   POST /ask     — retrieve → rerank → generate full pipeline
 """
 
+import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
+from api.middleware import verify_api_key
 from api.models import (
     AskRequest,
     AskResponse,
@@ -22,7 +25,7 @@ from api.models import (
     IngestResponse,
 )
 from core.config import get_settings
-from generation.generator import generate
+from generation.generator import extract_citations, generate, generate_stream
 from generation.query_rewriter import rewrite_query
 from ingest.chunker import chunk_fixed, chunk_recursive, chunk_sentence
 from ingest.embedder import embed_and_store
@@ -74,7 +77,12 @@ async def health(request: Request) -> HealthResponse:
     )
 
 
-@router.post("/ingest", response_model=IngestResponse, tags=["ingestion"])
+@router.post(
+    "/ingest",
+    response_model=IngestResponse,
+    tags=["ingestion"],
+    dependencies=[Depends(verify_api_key)],
+)
 async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
     """Load, chunk, embed, and store documents into the vector store.
 
@@ -158,7 +166,12 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
     )
 
 
-@router.post("/ask", response_model=AskResponse, tags=["query"])
+@router.post(
+    "/ask",
+    response_model=AskResponse,
+    tags=["query"],
+    dependencies=[Depends(verify_api_key)],
+)
 async def ask(request: Request, body: AskRequest) -> AskResponse:
     """Run the full RAG pipeline: retrieve → rerank → generate.
 
@@ -191,7 +204,7 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
 
     # Rerank on the original query (its true intent) rather than a variant.
     try:
-        reranked, is_relevant = await rerank(body.query, scored_chunks, top_n=body.top_n)
+        reranked, is_relevant, _ = await rerank(body.query, scored_chunks, top_n=body.top_n)
     except Exception as e:
         logger.error("Reranking failed: %s", e)
         raise HTTPException(status_code=503, detail="Reranking service unavailable") from e
@@ -224,3 +237,76 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
         rewritten_queries=rewrite.queries,
         applied_filters=rewrite.filters,
     )
+
+
+def _sse(event: str, data: object) -> str:
+    """Format a Server-Sent Events frame."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+@router.post(
+    "/ask/stream",
+    tags=["query"],
+    dependencies=[Depends(verify_api_key)],
+)
+async def ask_stream(request: Request, body: AskRequest) -> StreamingResponse:
+    """Run the RAG pipeline and stream the answer as Server-Sent Events.
+
+    Emits, in order: a ``meta`` frame (rewritten queries + applied filters),
+    successive ``delta`` frames (answer text as it generates), a ``citations``
+    frame, and a ``done`` frame (latency + chunk counts). Any pipeline failure
+    is surfaced as an ``error`` frame instead of raising, since the HTTP 200 and
+    response stream have already begun.
+
+    Args:
+        request: FastAPI request with app.state.pool.
+        body: AskRequest with query, top_k, and top_n parameters.
+
+    Returns:
+        StreamingResponse of text/event-stream frames.
+    """
+    pool = request.app.state.pool
+
+    async def event_stream() -> AsyncIterator[str]:
+        start_time = time.perf_counter()
+        try:
+            rewrite = await rewrite_query(body.query)
+            filters = rewrite.filters.as_containment()
+            yield _sse(
+                "meta",
+                {
+                    "rewritten_queries": rewrite.queries,
+                    "applied_filters": rewrite.filters.model_dump(exclude_none=True),
+                },
+            )
+
+            scored_chunks = await hybrid_retrieve(rewrite.queries, filters, pool, top_k=body.top_k)
+            reranked, is_relevant, _ = await rerank(body.query, scored_chunks, top_n=body.top_n)
+
+            async for delta in generate_stream(body.query, reranked, is_relevant, filters):
+                yield _sse("delta", {"text": delta})
+
+            citations = extract_citations(reranked, filters) if is_relevant else []
+            yield _sse("citations", [c.model_dump() for c in citations])
+
+            latency_ms = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                "Ask(stream) complete: query='%s' retrieved=%d used=%d latency=%.0fms",
+                body.query[:80],
+                len(scored_chunks),
+                len(reranked),
+                latency_ms,
+            )
+            yield _sse(
+                "done",
+                {
+                    "latency_ms": round(latency_ms, 1),
+                    "chunks_retrieved": len(scored_chunks),
+                    "chunks_used": len(reranked),
+                },
+            )
+        except Exception as e:
+            logger.error("Streaming ask failed for '%s': %s", body.query, e)
+            yield _sse("error", {"detail": "Pipeline error during streaming"})
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")

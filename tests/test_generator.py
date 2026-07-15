@@ -6,7 +6,7 @@ quotes a filing the user filtered out.
 """
 
 from api.models import Chunk, ScoredChunk
-from generation.generator import _extract_citations
+from generation.generator import extract_citations
 from generation.prompts import build_context_block, relevant_sources
 
 
@@ -66,14 +66,14 @@ class TestRelevantSources:
 
 class TestExtractCitations:
     def test_no_filter_emits_all_sources(self) -> None:
-        cites = _extract_citations([_shared_chunk()])
+        cites = extract_citations([_shared_chunk()])
         assert {(c.source, c.page) for c in cites} == {
             ("MU_10-K_2025.pdf", 42),
             ("SNDK_10-K_2025.pdf", 7),
         }
 
     def test_filter_emits_only_matching_source(self) -> None:
-        cites = _extract_citations([_shared_chunk()], {"ticker": "MU"})
+        cites = extract_citations([_shared_chunk()], {"ticker": "MU"})
         assert [(c.source, c.page) for c in cites] == [("MU_10-K_2025.pdf", 42)]
 
     def test_absent_sources_uses_top_level_metadata(self) -> None:
@@ -87,7 +87,7 @@ class TestExtractCitations:
             ),
             score=0.5,
         )
-        cites = _extract_citations([sc], {"ticker": "MU"})
+        cites = extract_citations([sc], {"ticker": "MU"})
         assert [(c.source, c.page) for c in cites] == [("legacy.pdf", 3)]
 
 
