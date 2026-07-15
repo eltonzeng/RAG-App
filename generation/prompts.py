@@ -37,8 +37,9 @@ with source filenames and page numbers where available."""
 
 NO_RELEVANT_CONTENT_RESPONSE = (
     "I don't have enough information in the provided filings to answer this question. "
-    "The documents currently ingested do not appear to contain relevant content for your query. "
-    "Please try rephrasing your question or ingest additional SEC filings that may cover this topic."
+    "The documents currently ingested do not appear to contain relevant content for "
+    "your query. Please try rephrasing your question or ingest additional SEC filings "
+    "that may cover this topic."
 )
 
 
@@ -62,9 +63,7 @@ def relevant_sources(sources: list[dict], filters: dict | None) -> list[dict]:
     """
     if not filters:
         return list(sources)
-    matching = [
-        src for src in sources if all(src.get(k) == v for k, v in filters.items())
-    ]
+    matching = [src for src in sources if all(src.get(k) == v for k, v in filters.items())]
     return matching or list(sources)
 
 

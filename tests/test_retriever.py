@@ -43,12 +43,9 @@ class TestReranker:
         ]
 
         mock_result = MagicMock()
-        mock_result.results = [
-            MagicMock(index=i, relevance_score=0.9 - i * 0.05)
-            for i in range(5)
-        ]
+        mock_result.results = [MagicMock(index=i, relevance_score=0.9 - i * 0.05) for i in range(5)]
 
-        with patch("retrieval.reranker.cohere.AsyncClient") as mock_client_cls:
+        with patch("retrieval.reranker.get_cohere_client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
@@ -68,14 +65,12 @@ class TestReranker:
         mock_result = MagicMock()
         mock_result.results = [MagicMock(index=0, relevance_score=0.05)]
 
-        with patch("retrieval.reranker.cohere.AsyncClient") as mock_client_cls:
+        with patch("retrieval.reranker.get_cohere_client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
 
-            reranked, is_relevant = await rerank(
-                "SEC annual report revenue", chunks, top_n=1
-            )
+            reranked, is_relevant = await rerank("SEC annual report revenue", chunks, top_n=1)
 
         assert is_relevant is False
 
@@ -87,7 +82,7 @@ class TestReranker:
         mock_result = MagicMock()
         mock_result.results = [MagicMock(index=0, relevance_score=RELEVANCE_THRESHOLD)]
 
-        with patch("retrieval.reranker.cohere.AsyncClient") as mock_client_cls:
+        with patch("retrieval.reranker.get_cohere_client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.rerank = AsyncMock(return_value=mock_result)
             mock_client_cls.return_value = mock_client
@@ -112,7 +107,7 @@ class TestReranker:
             make_scored_chunk("id-3", "Low relevance content", 0.2),
         ]
 
-        with patch("retrieval.reranker.cohere.AsyncClient") as mock_client_cls:
+        with patch("retrieval.reranker.get_cohere_client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.rerank = AsyncMock(side_effect=Exception("Cohere API unavailable"))
             mock_client_cls.return_value = mock_client
@@ -134,7 +129,7 @@ class TestReranker:
         # cosine-calibrated fallback threshold — the regression this guards against.
         chunks = [make_scored_chunk("id-1", "Irrelevant text", 0.4)]
 
-        with patch("retrieval.reranker.cohere.AsyncClient") as mock_client_cls:
+        with patch("retrieval.reranker.get_cohere_client") as mock_client_cls:
             mock_client = MagicMock()
             mock_client.rerank = AsyncMock(side_effect=Exception("Cohere unavailable"))
             mock_client_cls.return_value = mock_client
@@ -202,12 +197,12 @@ class _FakePool:
 
 
 def _patch_embeddings():
-    """Patch AsyncOpenAI in the retriever to return one dummy embedding."""
+    """Patch the retriever's OpenAI accessor to return one dummy embedding."""
     mock_client = MagicMock()
     emb_resp = MagicMock()
     emb_resp.data = [MagicMock(embedding=[0.1, 0.2, 0.3])]
     mock_client.embeddings.create = AsyncMock(return_value=emb_resp)
-    patcher = patch("retrieval.retriever.AsyncOpenAI", return_value=mock_client)
+    patcher = patch("retrieval.retriever.get_openai_client", return_value=mock_client)
     return patcher
 
 
@@ -229,12 +224,12 @@ class TestHybridRetrieveFallback:
             return []
 
         pool = _FakePool(AsyncMock())
-        with _patch_embeddings(), \
-                patch.object(retriever, "_search_semantic", side_effect=fake_semantic), \
-                patch.object(retriever, "_search_bm25", side_effect=fake_bm25):
-            result = await retriever.hybrid_retrieve(
-                ["q"], {"ticker": "AOEO"}, pool, top_k=10
-            )
+        with (
+            _patch_embeddings(),
+            patch.object(retriever, "_search_semantic", side_effect=fake_semantic),
+            patch.object(retriever, "_search_bm25", side_effect=fake_bm25),
+        ):
+            result = await retriever.hybrid_retrieve(["q"], {"ticker": "AOEO"}, pool, top_k=10)
 
         assert [sc.chunk.id for sc in result] == ["c1"]
 
@@ -253,12 +248,12 @@ class TestHybridRetrieveFallback:
             return []
 
         pool = _FakePool(AsyncMock())
-        with _patch_embeddings(), \
-                patch.object(retriever, "_search_semantic", side_effect=fake_semantic), \
-                patch.object(retriever, "_search_bm25", side_effect=fake_bm25):
-            result = await retriever.hybrid_retrieve(
-                ["q"], {"ticker": "MU"}, pool, top_k=10
-            )
+        with (
+            _patch_embeddings(),
+            patch.object(retriever, "_search_semantic", side_effect=fake_semantic),
+            patch.object(retriever, "_search_bm25", side_effect=fake_bm25),
+        ):
+            result = await retriever.hybrid_retrieve(["q"], {"ticker": "MU"}, pool, top_k=10)
 
         assert [sc.chunk.id for sc in result] == ["c1"]
         # The filter matched, so retrieval never retried unfiltered.

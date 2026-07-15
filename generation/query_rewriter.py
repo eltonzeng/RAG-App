@@ -12,14 +12,13 @@ rewrite step.
 
 import logging
 
-import anthropic
-
 from api.models import MetadataFilters, QueryRewriteResult
+from core.clients import get_anthropic_client
+from core.config import get_settings
 from generation.prompts import QUERY_REWRITE_SYSTEM_PROMPT, QUERY_REWRITE_TOOL
 
 logger = logging.getLogger(__name__)
 
-QUERY_REWRITE_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 512
 MAX_QUERIES = 4
 
@@ -40,11 +39,13 @@ async def rewrite_query(query: str) -> QueryRewriteResult:
         On any failure, returns the original query with empty filters (logged as
         a warning) so retrieval can still proceed.
     """
-    client = anthropic.AsyncAnthropic()
+    client = get_anthropic_client()
 
     try:
-        response = await client.messages.create(
-            model=QUERY_REWRITE_MODEL,
+        # The raw-dict tool schema + tool_choice are valid at runtime but don't
+        # match the SDK's strict TypedDict overloads for messages.create.
+        response = await client.messages.create(  # type: ignore[call-overload]
+            model=get_settings().query_rewrite_model,
             max_tokens=MAX_TOKENS,
             system=QUERY_REWRITE_SYSTEM_PROMPT,
             tools=[QUERY_REWRITE_TOOL],
@@ -80,6 +81,7 @@ async def rewrite_query(query: str) -> QueryRewriteResult:
 
     logger.info(
         "Rewrote query into %d variants — filters: %s",
-        len(queries), filters.as_containment() or "none",
+        len(queries),
+        filters.as_containment() or "none",
     )
     return QueryRewriteResult(queries=queries, filters=filters)

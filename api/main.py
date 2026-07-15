@@ -11,33 +11,13 @@ import asyncpg
 from fastapi import FastAPI
 
 from api.routes import router
+from core.config import get_settings
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-# These are imported lazily in routes to avoid circular deps,
-# but we expose them here as single source of truth.
-EMBEDDING_MODEL = "text-embedding-3-small"
-GENERATION_MODEL = "claude-sonnet-4-20250514"
-
-
-def _get_database_url() -> str:
-    """Read DATABASE_URL from environment, raising clearly if missing.
-
-    Returns:
-        The database connection string.
-
-    Raises:
-        RuntimeError: If DATABASE_URL is not set.
-    """
-    import os
-    url = os.getenv("DATABASE_URL")
-    if not url:
-        raise RuntimeError("DATABASE_URL environment variable is not set")
-    return url
 
 
 async def create_pool(
@@ -59,10 +39,7 @@ async def create_pool(
     Returns:
         An initialized asyncpg connection pool.
     """
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    db_url = _get_database_url()
+    db_url = get_settings().database_url
 
     # asyncpg requires the scheme to be postgresql:// not postgres://
     if db_url.startswith("postgres://"):

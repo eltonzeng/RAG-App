@@ -20,8 +20,9 @@ All functions are pure and dependency-free (no numpy).
 
 import math
 
-# A gold label / source key is a (source_filename, page_number) tuple.
-GoldKey = tuple[str, object]
+# A gold label / source key is a (source_filename, page_number) tuple. The
+# filename may be absent (None) on malformed provenance, so it is optional.
+GoldKey = tuple[str | None, object]
 
 
 def source_keys(chunk_sources: list[dict]) -> set[GoldKey]:

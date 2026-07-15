@@ -44,14 +44,16 @@ def load_pdf(path: str) -> list[Document]:
             logger.warning("Page %d of %s has no extractable text", page_num, file_path.name)
             continue
 
-        documents.append(Document(
-            content=text,
-            metadata={
-                "source_filename": file_path.name,
-                "page_number": page_num,
-                "file_type": "pdf",
-            },
-        ))
+        documents.append(
+            Document(
+                content=text,
+                metadata={
+                    "source_filename": file_path.name,
+                    "page_number": page_num,
+                    "file_type": "pdf",
+                },
+            )
+        )
 
     if not documents:
         raise ValueError(f"No extractable text found in {path}")
@@ -82,13 +84,15 @@ def load_txt(path: str) -> list[Document]:
         raise ValueError(f"Empty text file: {path}")
 
     logger.info("Loaded text file: %s (%d chars)", file_path.name, len(text))
-    return [Document(
-        content=text,
-        metadata={
-            "source_filename": file_path.name,
-            "file_type": "txt",
-        },
-    )]
+    return [
+        Document(
+            content=text,
+            metadata={
+                "source_filename": file_path.name,
+                "file_type": "txt",
+            },
+        )
+    ]
 
 
 def load_urls(url_list: list[str]) -> list[Document]:
@@ -104,9 +108,9 @@ def load_urls(url_list: list[str]) -> list[Document]:
 
     for url in url_list:
         try:
-            response = requests.get(url, timeout=30, headers={
-                "User-Agent": "SEC-RAG-Research-Bot/1.0"
-            })
+            response = requests.get(
+                url, timeout=30, headers={"User-Agent": "SEC-RAG-Research-Bot/1.0"}
+            )
             response.raise_for_status()
 
             soup = BeautifulSoup(response.text, "html.parser")
@@ -120,13 +124,15 @@ def load_urls(url_list: list[str]) -> list[Document]:
                 logger.warning("No text content extracted from %s", url)
                 continue
 
-            documents.append(Document(
-                content=text,
-                metadata={
-                    "source_filename": url,
-                    "file_type": "url",
-                },
-            ))
+            documents.append(
+                Document(
+                    content=text,
+                    metadata={
+                        "source_filename": url,
+                        "file_type": "url",
+                    },
+                )
+            )
             logger.info("Loaded URL: %s (%d chars)", url, len(text))
 
         except requests.RequestException as e:

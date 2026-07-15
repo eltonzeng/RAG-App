@@ -102,9 +102,7 @@ async def evaluate_variant(
             totals[f"recall@{k}"] += metrics.recall_at_k(retrieved, gold, k)
         totals[f"ndcg@{NDCG_K}"] += metrics.ndcg_at_k(retrieved, gold, NDCG_K)
         totals["mrr"] += metrics.mrr(retrieved, gold)
-        totals[f"hit_rate@{RECALL_KS[-1]}"] += metrics.hit_rate_at_k(
-            retrieved, gold, RECALL_KS[-1]
-        )
+        totals[f"hit_rate@{RECALL_KS[-1]}"] += metrics.hit_rate_at_k(retrieved, gold, RECALL_KS[-1])
 
     return {name: value / n for name, value in totals.items()}
 

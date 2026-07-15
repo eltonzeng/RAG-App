@@ -56,17 +56,11 @@ async def _run(args: argparse.Namespace) -> int:
     pool = await open_pool()
     try:
         if args.suite == "retrieval":
-            variant_names = (
-                [v.strip() for v in args.variants.split(",")] if args.variants else None
-            )
-            results = await run_retrieval_eval(
-                pool, variant_names=variant_names, limit=args.limit
-            )
+            variant_names = [v.strip() for v in args.variants.split(",")] if args.variants else None
+            results = await run_retrieval_eval(pool, variant_names=variant_names, limit=args.limit)
             table = render_markdown_table(results, row_label="variant")
         else:
-            gen = await run_generation_eval(
-                pool, concurrency=args.concurrency, limit=args.limit
-            )
+            gen = await run_generation_eval(pool, concurrency=args.concurrency, limit=args.limit)
             results = {"generation": gen}
             table = render_markdown_table(results, row_label="suite")
     finally:
@@ -93,25 +87,36 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="RAG evaluation harness")
     parser.add_argument(
-        "--suite", choices=["retrieval", "generation"], required=True,
+        "--suite",
+        choices=["retrieval", "generation"],
+        required=True,
         help="Which eval suite to run.",
     )
     parser.add_argument(
-        "--variants", default=None,
+        "--variants",
+        default=None,
         help=f"Comma-separated retrieval variants (default all: {', '.join(VARIANTS)}).",
     )
     parser.add_argument(
-        "--concurrency", type=int, default=3,
+        "--concurrency",
+        type=int,
+        default=3,
         help="Max concurrent pipeline+judge runs for the generation suite.",
     )
     parser.add_argument(
-        "--fail-under", action="append", default=[], metavar="KEY=FLOOR",
+        "--fail-under",
+        action="append",
+        default=[],
+        metavar="KEY=FLOOR",
         help="Exit non-zero if a metric is below the floor, e.g. hybrid.recall@10=0.6.",
     )
     parser.add_argument(
-        "--limit", type=int, default=None, metavar="N",
+        "--limit",
+        type=int,
+        default=None,
+        metavar="N",
         help="Evaluate only the first N dataset rows. Useful for smoke-testing "
-             "before a full run, especially to bound Opus judge cost.",
+        "before a full run, especially to bound Opus judge cost.",
     )
     args = parser.parse_args()
 

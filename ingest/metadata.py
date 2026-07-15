@@ -23,9 +23,7 @@ _CONTENT_SCAN_CHARS = 4000
 # 10-K / 10-Q (and amendments like 10-K/A). Normalized to upper case. Uses
 # explicit non-alphanumeric boundaries because filenames often use underscores
 # (e.g. "AAPL_10-K_2023.pdf"), where \b does not match between "_" and "1".
-_FORM_TYPE_RE = re.compile(
-    r"(?<![0-9A-Za-z])(10[\-\s]?[KQ])(?:/A)?(?![A-Za-z])", re.IGNORECASE
-)
+_FORM_TYPE_RE = re.compile(r"(?<![0-9A-Za-z])(10[\-\s]?[KQ])(?:/A)?(?![A-Za-z])", re.IGNORECASE)
 # Four-digit fiscal years in a plausible range. Digit-boundary lookarounds
 # (rather than \b) so years adjacent to "_" or letters in filenames still match.
 _YEAR_RE = re.compile(r"(?<!\d)(19[9]\d|20[0-4]\d)(?!\d)")
@@ -36,15 +34,11 @@ _FY_PHRASE_RE = re.compile(
 )
 # Quarter cues: "Q3", "third quarter", "quarterly period ended ... (Q2)".
 _QUARTER_RE = re.compile(r"\bQ([1-4])\b", re.IGNORECASE)
-_QUARTER_WORD_RE = re.compile(
-    r"\b(first|second|third|fourth)\s+quarter\b", re.IGNORECASE
-)
+_QUARTER_WORD_RE = re.compile(r"\b(first|second|third|fourth)\s+quarter\b", re.IGNORECASE)
 # Ticker in a filename like "AAPL_10-K_2023.pdf" or "aapl-10q.pdf".
 _FILENAME_TICKER_RE = re.compile(r"\b([A-Z]{1,5})[\-_]?(?:10[\-]?[KQ])", re.IGNORECASE)
 # Ticker in content, e.g. "(NASDAQ: AAPL)" or "Symbol: AAPL".
-_CONTENT_TICKER_RE = re.compile(
-    r"(?:NYSE|NASDAQ|symbol|ticker)[:\s]+([A-Z]{1,5})\b"
-)
+_CONTENT_TICKER_RE = re.compile(r"(?:NYSE|NASDAQ|symbol|ticker)[:\s]+([A-Z]{1,5})\b")
 
 _WORD_TO_QUARTER = {"first": 1, "second": 2, "third": 3, "fourth": 4}
 
@@ -94,11 +88,7 @@ def extract_filing_metadata(doc: Document) -> dict:
     # The filename year is stable across every page of the same filing. Fall back
     # to the explicit phrase, then any plausible year in the content, only when
     # the filename itself carries no year.
-    year_match = (
-        _YEAR_RE.search(filename)
-        or _FY_PHRASE_RE.search(head)
-        or _YEAR_RE.search(head)
-    )
+    year_match = _YEAR_RE.search(filename) or _FY_PHRASE_RE.search(head) or _YEAR_RE.search(head)
     if year_match:
         result["fiscal_year"] = int(year_match.group(1))
 

@@ -6,7 +6,6 @@ Models use strict validation and clear field descriptions for API documentation.
 
 from pydantic import BaseModel, Field
 
-
 # --- Internal pipeline models ---
 
 

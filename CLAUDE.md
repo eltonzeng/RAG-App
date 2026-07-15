@@ -14,7 +14,7 @@ decisions matter as much as functionality. This will be reviewed by hiring manag
 ## Stack (do not substitute without asking)
 - Python 3.11+ · FastAPI · LangChain v0.2+ LCEL syntax only
 - OpenAI text-embedding-3-small for embeddings
-- Claude claude-sonnet-4-20250514 for generation
+- Claude claude-sonnet-4-6 for generation (claude-sonnet-4-20250514 retired from the API)
 - Cohere Rerank API for reranking
 - Pydantic v2 for all data models
 

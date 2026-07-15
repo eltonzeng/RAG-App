@@ -16,9 +16,7 @@ from api.models import Chunk, Citation, MetadataFilters, QueryRewriteResult, Sco
 
 def _rewrite(query: str = "q", **filters) -> QueryRewriteResult:
     """Build a QueryRewriteResult for patching api.routes.rewrite_query."""
-    return QueryRewriteResult(
-        queries=[query], filters=MetadataFilters(**filters)
-    )
+    return QueryRewriteResult(queries=[query], filters=MetadataFilters(**filters))
 
 
 @pytest.fixture
@@ -121,7 +119,7 @@ class TestIngestEndpoint:
         self, async_client: AsyncClient, mock_pool, sample_scored_chunk
     ) -> None:
         """Successful ingest should return 200 with document/chunk counts."""
-        from api.models import Chunk, Document
+        from api.models import Document
 
         with (
             patch("api.routes.load_pdf") as mock_load,

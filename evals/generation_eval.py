@@ -52,8 +52,11 @@ async def _answer_and_judge(
         verdict = await judge_answer(question, answer, reranked, citations)
         logger.info(
             "Judged '%s' — faithful=%d cite=%d rel=%d grounded=%s",
-            question[:60], verdict.faithfulness, verdict.citation_accuracy,
-            verdict.answer_relevance, verdict.grounded,
+            question[:60],
+            verdict.faithfulness,
+            verdict.citation_accuracy,
+            verdict.answer_relevance,
+            verdict.grounded,
         )
         return verdict
 

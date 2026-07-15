@@ -13,14 +13,27 @@ from generation.prompts import build_context_block, relevant_sources
 def _shared_chunk() -> ScoredChunk:
     """A deduped chunk of boilerplate shared across an MU and an SNDK filing."""
     sources = [
-        {"source_filename": "MU_10-K_2025.pdf", "page_number": 42,
-         "ticker": "MU", "fiscal_year": 2025},
-        {"source_filename": "SNDK_10-K_2025.pdf", "page_number": 7,
-         "ticker": "SNDK", "fiscal_year": 2025},
+        {
+            "source_filename": "MU_10-K_2025.pdf",
+            "page_number": 42,
+            "ticker": "MU",
+            "fiscal_year": 2025,
+        },
+        {
+            "source_filename": "SNDK_10-K_2025.pdf",
+            "page_number": 7,
+            "ticker": "SNDK",
+            "fiscal_year": 2025,
+        },
     ]
     return ScoredChunk(
-        chunk=Chunk(id="c1", content="shared risk boilerplate", chunk_index=0,
-                    char_count=23, metadata={"sources": sources}),
+        chunk=Chunk(
+            id="c1",
+            content="shared risk boilerplate",
+            chunk_index=0,
+            char_count=23,
+            metadata={"sources": sources},
+        ),
         score=0.9,
     )
 
@@ -55,7 +68,8 @@ class TestExtractCitations:
     def test_no_filter_emits_all_sources(self) -> None:
         cites = _extract_citations([_shared_chunk()])
         assert {(c.source, c.page) for c in cites} == {
-            ("MU_10-K_2025.pdf", 42), ("SNDK_10-K_2025.pdf", 7),
+            ("MU_10-K_2025.pdf", 42),
+            ("SNDK_10-K_2025.pdf", 7),
         }
 
     def test_filter_emits_only_matching_source(self) -> None:
@@ -64,8 +78,13 @@ class TestExtractCitations:
 
     def test_absent_sources_uses_top_level_metadata(self) -> None:
         sc = ScoredChunk(
-            chunk=Chunk(id="c2", content="legacy", chunk_index=0, char_count=6,
-                        metadata={"source_filename": "legacy.pdf", "page_number": 3}),
+            chunk=Chunk(
+                id="c2",
+                content="legacy",
+                chunk_index=0,
+                char_count=6,
+                metadata={"source_filename": "legacy.pdf", "page_number": 3},
+            ),
             score=0.5,
         )
         cites = _extract_citations([sc], {"ticker": "MU"})

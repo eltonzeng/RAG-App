@@ -1,0 +1,54 @@
+[project]
+name = "sec-filings-rag"
+version = "1.0.0"
+description = "Retrieval-augmented generation over SEC EDGAR filings (hybrid BM25 + pgvector, Cohere rerank, Claude generation) with an evaluation harness."
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (import ordering)
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "T20",  # flake8-print (enforce the CLAUDE.md "no print" rule)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The eval CLI entrypoint intentionally writes its report tables to stdout.
+"evals/run.py" = ["T20"]
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# Third-party packages without bundled type stubs.
+[[tool.mypy.overrides]]
+module = [
+    "cohere.*",
+    "streamlit.*",
+    "langchain_text_splitters.*",
+    "pgvector.*",
+    "psycopg2.*",
+    "asyncpg.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=api --cov=core --cov=retrieval --cov=generation --cov=ingest --cov=evals --cov-report=term-missing"
+
+[tool.coverage.report]
+# Regression floor, not an aspiration. The unit-testable core is well covered
+# (reranker/chunker 100%, metadata/query_rewriter 90%+); the eval harness and IO
+# loaders pull the aggregate down. Ratcheted up as suites are added (Phase 4
+# lifts eval coverage). Keep this just below the current measured total.
+fail_under = 55

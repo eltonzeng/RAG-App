@@ -8,21 +8,24 @@ Routes:
 
 import logging
 import time
+from collections.abc import Callable
 
-import psycopg2
 from fastapi import APIRouter, HTTPException, Request
 
 from api.models import (
     AskRequest,
     AskResponse,
+    Chunk,
+    Document,
     HealthResponse,
     IngestRequest,
     IngestResponse,
 )
-from generation.generator import GENERATION_MODEL, generate
+from core.config import get_settings
+from generation.generator import generate
 from generation.query_rewriter import rewrite_query
 from ingest.chunker import chunk_fixed, chunk_recursive, chunk_sentence
-from ingest.embedder import EMBEDDING_MODEL, embed_and_store
+from ingest.embedder import embed_and_store
 from ingest.loader import load_pdf, load_txt, load_urls
 from ingest.metadata import extract_filing_metadata
 from retrieval.reranker import rerank
@@ -31,7 +34,7 @@ from retrieval.retriever import hybrid_retrieve
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-CHUNKING_STRATEGIES = {
+CHUNKING_STRATEGIES: dict[str, Callable[[list[Document]], list[Chunk]]] = {
     "fixed": chunk_fixed,
     "recursive": chunk_recursive,
     "sentence": chunk_sentence,
@@ -61,12 +64,13 @@ async def health(request: Request) -> HealthResponse:
         logger.error("Health check DB query failed: %s", e)
 
     status = "ok" if db_connected else "degraded"
+    settings = get_settings()
     return HealthResponse(
         status=status,
         database_connected=db_connected,
         chunk_count=chunk_count,
-        embedding_model=EMBEDDING_MODEL,
-        generation_model=GENERATION_MODEL,
+        embedding_model=settings.embedding_model,
+        generation_model=settings.generation_model,
     )
 
 
@@ -90,9 +94,10 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
 
     strategy_fn = CHUNKING_STRATEGIES.get(body.chunk_strategy)
     if strategy_fn is None:
+        known = list(CHUNKING_STRATEGIES)
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown chunk_strategy '{body.chunk_strategy}'. Use: {list(CHUNKING_STRATEGIES)}",
+            detail=f"Unknown chunk_strategy '{body.chunk_strategy}'. Use: {known}",
         )
 
     documents = []
@@ -107,10 +112,10 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
             else:
                 logger.warning("Unsupported file type, skipping: %s", path)
         except (FileNotFoundError, ValueError) as e:
-            raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=400, detail=str(e)) from e
         except Exception as e:
             logger.error("Failed to load file %s: %s", path, e)
-            raise HTTPException(status_code=500, detail=f"Failed to load {path}")
+            raise HTTPException(status_code=500, detail=f"Failed to load {path}") from e
 
     # Load URLs
     if body.urls:
@@ -118,10 +123,12 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
             documents.extend(load_urls(body.urls))
         except Exception as e:
             logger.error("Failed to load URLs: %s", e)
-            raise HTTPException(status_code=500, detail="Failed to load one or more URLs")
+            raise HTTPException(status_code=500, detail="Failed to load one or more URLs") from e
 
     if not documents:
-        raise HTTPException(status_code=400, detail="No content could be loaded from provided sources")
+        raise HTTPException(
+            status_code=400, detail="No content could be loaded from provided sources"
+        )
 
     # Extract best-effort filing metadata (ticker/year/quarter/form_type) per
     # document so chunks inherit it for query-time filtering.
@@ -133,7 +140,7 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
         chunks = strategy_fn(documents)
     except Exception as e:
         logger.error("Chunking failed: %s", e)
-        raise HTTPException(status_code=500, detail="Chunking failed")
+        raise HTTPException(status_code=500, detail="Chunking failed") from e
 
     # Embed and store (deduping by content hash)
     try:
@@ -141,7 +148,7 @@ async def ingest(request: Request, body: IngestRequest) -> IngestResponse:
         embedded, skipped = await embed_and_store(chunks, pool)
     except Exception as e:
         logger.error("Embedding/storage failed: %s", e)
-        raise HTTPException(status_code=500, detail="Embedding or database storage failed")
+        raise HTTPException(status_code=500, detail="Embedding or database storage failed") from e
 
     return IngestResponse(
         documents_loaded=len(documents),
@@ -175,12 +182,10 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
 
     # Retrieve (hybrid semantic + BM25, multi-query RRF, metadata-filtered)
     try:
-        scored_chunks = await hybrid_retrieve(
-            rewrite.queries, filters, pool, top_k=body.top_k
-        )
+        scored_chunks = await hybrid_retrieve(rewrite.queries, filters, pool, top_k=body.top_k)
     except Exception as e:
         logger.error("Retrieval failed for query '%s': %s", body.query, e)
-        raise HTTPException(status_code=503, detail="Retrieval service unavailable")
+        raise HTTPException(status_code=503, detail="Retrieval service unavailable") from e
 
     chunks_retrieved = len(scored_chunks)
 
@@ -189,7 +194,7 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
         reranked, is_relevant = await rerank(body.query, scored_chunks, top_n=body.top_n)
     except Exception as e:
         logger.error("Reranking failed: %s", e)
-        raise HTTPException(status_code=503, detail="Reranking service unavailable")
+        raise HTTPException(status_code=503, detail="Reranking service unavailable") from e
 
     chunks_used = len(reranked)
 
@@ -199,12 +204,15 @@ async def ask(request: Request, body: AskRequest) -> AskResponse:
         answer, citations = await generate(body.query, reranked, is_relevant, filters)
     except Exception as e:
         logger.error("Generation failed: %s", e)
-        raise HTTPException(status_code=503, detail="Generation service unavailable")
+        raise HTTPException(status_code=503, detail="Generation service unavailable") from e
 
     latency_ms = (time.perf_counter() - start_time) * 1000
     logger.info(
         "Ask complete: query='%s' retrieved=%d used=%d latency=%.0fms",
-        body.query[:80], chunks_retrieved, chunks_used, latency_ms,
+        body.query[:80],
+        chunks_retrieved,
+        chunks_used,
+        latency_ms,
     )
 
     return AskResponse(

@@ -16,13 +16,13 @@ import logging
 import time
 
 import asyncpg
-from openai import AsyncOpenAI
 
 from api.models import Chunk, ScoredChunk
+from core.clients import get_openai_client
+from core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_MODEL = "text-embedding-3-small"
 RRF_K = 60  # RRF damping constant; standard default.
 # Per-branch candidate pool. Widened beyond top_k so fusion has material to work
 # with before the final trim.
@@ -73,7 +73,8 @@ async def _search_semantic(
             ORDER BY embedding <=> $1::vector
             LIMIT $2
             """,
-            embedding, limit,
+            embedding,
+            limit,
         )
     return await conn.fetch(
         """
@@ -84,7 +85,9 @@ async def _search_semantic(
         ORDER BY embedding <=> $1::vector
         LIMIT $3
         """,
-        embedding, filter_json, limit,
+        embedding,
+        filter_json,
+        limit,
     )
 
 
@@ -110,7 +113,9 @@ async def _search_bm25(
             ORDER BY paradedb.score(id) DESC
             LIMIT $3
             """,
-            query, embedding, limit,
+            query,
+            embedding,
+            limit,
         )
     return await conn.fetch(
         """
@@ -122,7 +127,10 @@ async def _search_bm25(
         ORDER BY paradedb.score(id) DESC
         LIMIT $4
         """,
-        query, embedding, filter_json, limit,
+        query,
+        embedding,
+        filter_json,
+        limit,
     )
 
 
@@ -184,9 +192,11 @@ async def hybrid_retrieve(
     filter_json = json.dumps([filters]) if filters else None
 
     # Embed every query variant in a single OpenAI call.
-    client = AsyncOpenAI()
+    client = get_openai_client()
     try:
-        response = await client.embeddings.create(model=EMBEDDING_MODEL, input=queries)
+        response = await client.embeddings.create(
+            model=get_settings().embedding_model, input=queries
+        )
         embeddings = [item.embedding for item in response.data]
     except Exception as e:
         logger.error("Failed to embed query variants: %s", e)
@@ -199,6 +209,7 @@ async def hybrid_retrieve(
 
         Returns the fused ScoredChunks and the number of unique chunks seen.
         """
+
         async def _run_variant(query: str, embedding: list[float]) -> list[list[asyncpg.Record]]:
             async with db_pool.acquire() as conn:
                 semantic = await _search_semantic(conn, embedding, fj, branch_limit)
@@ -206,7 +217,7 @@ async def hybrid_retrieve(
             return [semantic, bm25]
 
         per_variant = await asyncio.gather(
-            *(_run_variant(q, emb) for q, emb in zip(queries, embeddings))
+            *(_run_variant(q, emb) for q, emb in zip(queries, embeddings, strict=True))
         )
 
         # Collect every branch's ranked ID list and a unified chunk map (keeping
@@ -253,8 +264,13 @@ async def hybrid_retrieve(
     logger.info(
         "Hybrid retrieve: %d variants × 2 branches → %d unique → %d fused "
         "(top_k=%d, filters=%s, fallback=%s) in %.3fs — top cosine: %.4f",
-        len(queries), unique, len(fused), top_k,
-        filters or "none", used_fallback, elapsed,
+        len(queries),
+        unique,
+        len(fused),
+        top_k,
+        filters or "none",
+        used_fallback,
+        elapsed,
         fused[0].score if fused else 0.0,
     )
     return fused

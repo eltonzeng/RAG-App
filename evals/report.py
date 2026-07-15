@@ -4,7 +4,7 @@ Pure formatting — no dependency on tabulate or pandas.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPORTS_DIR = Path(__file__).parent / "reports"
@@ -55,7 +55,7 @@ def write_json_report(suite: str, results: dict) -> Path:
         Path to the written report.
     """
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     path = REPORTS_DIR / f"{suite}_{stamp}.json"
     payload = {
         "suite": suite,

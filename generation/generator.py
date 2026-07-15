@@ -5,12 +5,13 @@ and extracts structured citations from chunk metadata.
 """
 
 import logging
-import re
 import time
 
 import anthropic
 
 from api.models import Citation, ScoredChunk
+from core.clients import get_anthropic_client
+from core.config import get_settings
 from generation.prompts import (
     NO_RELEVANT_CONTENT_RESPONSE,
     SYSTEM_PROMPT,
@@ -21,7 +22,6 @@ from generation.prompts import (
 
 logger = logging.getLogger(__name__)
 
-GENERATION_MODEL = "claude-sonnet-4-20250514"
 MAX_TOKENS = 1024
 
 
@@ -53,10 +53,12 @@ def _extract_citations(
         if raw_sources:
             sources = relevant_sources(raw_sources, filters)
         else:
-            sources = [{
-                "source_filename": chunk.metadata.get("source_filename", "Unknown"),
-                "page_number": chunk.metadata.get("page_number"),
-            }]
+            sources = [
+                {
+                    "source_filename": chunk.metadata.get("source_filename", "Unknown"),
+                    "page_number": chunk.metadata.get("page_number"),
+                }
+            ]
 
         for src in sources:
             source = src.get("source_filename", "Unknown")
@@ -108,12 +110,12 @@ async def generate(
         query=query,
     )
 
-    client = anthropic.AsyncAnthropic()
+    client = get_anthropic_client()
     answer_parts: list[str] = []
 
     try:
         async with client.messages.stream(
-            model=GENERATION_MODEL,
+            model=get_settings().generation_model,
             max_tokens=MAX_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_message}],
@@ -126,7 +128,9 @@ async def generate(
 
         logger.info(
             "Generation complete: %d chars in %.2fs using %d context chunks",
-            len(answer), elapsed, len(scored_chunks),
+            len(answer),
+            elapsed,
+            len(scored_chunks),
         )
 
     except anthropic.APIError as e:

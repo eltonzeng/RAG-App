@@ -39,16 +39,18 @@ def _build_chunks(texts: list[str], doc: Document, strategy: str) -> list[Chunk]
     """
     chunks: list[Chunk] = []
     for i, text in enumerate(texts):
-        chunks.append(Chunk(
-            id=str(uuid.uuid4()),
-            content=text,
-            chunk_index=i,
-            char_count=len(text),
-            metadata={
-                **doc.metadata,
-                "chunk_strategy": strategy,
-            },
-        ))
+        chunks.append(
+            Chunk(
+                id=str(uuid.uuid4()),
+                content=text,
+                chunk_index=i,
+                char_count=len(text),
+                metadata={
+                    **doc.metadata,
+                    "chunk_strategy": strategy,
+                },
+            )
+        )
     return chunks
 
 
@@ -86,7 +88,10 @@ def chunk_fixed(
 
     logger.info(
         "Fixed chunking: %d docs → %d chunks (size=%d, overlap=%d)",
-        len(docs), len(all_chunks), size, overlap,
+        len(docs),
+        len(all_chunks),
+        size,
+        overlap,
     )
     return all_chunks
 
@@ -123,7 +128,10 @@ def chunk_recursive(
 
     logger.info(
         "Recursive chunking: %d docs → %d chunks (size=%d, overlap=%d)",
-        len(docs), len(all_chunks), chunk_size, chunk_overlap,
+        len(docs),
+        len(all_chunks),
+        chunk_size,
+        chunk_overlap,
     )
     return all_chunks
 
@@ -158,6 +166,8 @@ def chunk_sentence(
 
     logger.info(
         "Sentence chunking: %d docs → %d chunks (overlap=%d)",
-        len(docs), len(all_chunks), chunk_overlap,
+        len(docs),
+        len(all_chunks),
+        chunk_overlap,
     )
     return all_chunks

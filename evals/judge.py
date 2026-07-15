@@ -11,9 +11,10 @@ verdicts independent of judge==generator self-consistency bias.
 
 import logging
 
-import anthropic
 from pydantic import BaseModel, Field
 
+from core.clients import get_anthropic_client
+from core.config import get_settings
 from evals.prompts import (
     JUDGE_SYSTEM_PROMPT,
     JUDGE_USER_TEMPLATE,
@@ -23,7 +24,6 @@ from evals.prompts import (
 
 logger = logging.getLogger(__name__)
 
-JUDGE_MODEL = "claude-sonnet-5"
 MAX_TOKENS = 1024
 
 _VERDICT_TOOL = {
@@ -127,10 +127,12 @@ async def judge_answer(
         citations=format_citations(citations),
     )
 
-    client = anthropic.AsyncAnthropic()
+    client = get_anthropic_client()
     try:
-        response = await client.messages.create(
-            model=JUDGE_MODEL,
+        # The raw-dict tool schema + tool_choice are valid at runtime but don't
+        # match the SDK's strict TypedDict overloads for messages.create.
+        response = await client.messages.create(  # type: ignore[call-overload]
+            model=get_settings().judge_model,
             max_tokens=MAX_TOKENS,
             system=JUDGE_SYSTEM_PROMPT,
             tools=[_VERDICT_TOOL],

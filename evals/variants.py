@@ -16,14 +16,14 @@ import json
 from dataclasses import dataclass
 
 import asyncpg
-from openai import AsyncOpenAI
 
 from api.models import ScoredChunk
+from core.clients import get_openai_client
+from core.config import get_settings
 from generation.query_rewriter import rewrite_query
 from retrieval.reranker import rerank
 from retrieval.retriever import (
     BRANCH_LIMIT_MULTIPLIER,
-    EMBEDDING_MODEL,
     _row_to_scored_chunk,
     _rrf_fuse,
     _search_bm25,
@@ -121,8 +121,8 @@ async def run_variant(
         queries = [question]
         filters = dict(dataset_filters) if variant.use_filters else {}
 
-    client = AsyncOpenAI()
-    response = await client.embeddings.create(model=EMBEDDING_MODEL, input=queries)
+    client = get_openai_client()
+    response = await client.embeddings.create(model=get_settings().embedding_model, input=queries)
     embeddings = [item.embedding for item in response.data]
 
     branch_limit = max(top_k * BRANCH_LIMIT_MULTIPLIER, top_k)
@@ -132,7 +132,7 @@ async def run_variant(
         chunk_map: dict[str, ScoredChunk] = {}
         ranked_lists: list[list[str]] = []
         async with db_pool.acquire() as conn:
-            for query, embedding in zip(queries, embeddings):
+            for query, embedding in zip(queries, embeddings, strict=True):
                 if variant.use_semantic:
                     rows = await _search_semantic(conn, embedding, fj, branch_limit)
                     ranked_lists.append(_collect(rows, chunk_map))

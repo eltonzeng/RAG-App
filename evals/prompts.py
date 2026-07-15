@@ -57,10 +57,12 @@ def format_context(scored_chunks: list) -> str:
     """
     parts: list[str] = []
     for i, sc in enumerate(scored_chunks, start=1):
-        sources = sc.chunk.metadata.get("sources") or [{
-            "source_filename": sc.chunk.metadata.get("source_filename", "Unknown"),
-            "page_number": sc.chunk.metadata.get("page_number"),
-        }]
+        sources = sc.chunk.metadata.get("sources") or [
+            {
+                "source_filename": sc.chunk.metadata.get("source_filename", "Unknown"),
+                "page_number": sc.chunk.metadata.get("page_number"),
+            }
+        ]
         labels = []
         for src in sources:
             name = src.get("source_filename", "Unknown")
