@@ -96,7 +96,6 @@ async def run_variant(
     dataset_filters: dict,
     db_pool: asyncpg.Pool,
     top_k: int = 20,
-    top_n: int = 5,
 ) -> list[ScoredChunk]:
     """Run one retrieval variant for a single question.
 
@@ -106,11 +105,13 @@ async def run_variant(
         dataset_filters: Filters attached to the dataset row (used when
             use_filters is set and use_rewrite is not).
         db_pool: asyncpg pool.
-        top_k: Candidates to fuse/return before reranking.
-        top_n: Chunks to keep if reranking.
+        top_k: Candidates to fuse/return (and to rerank, when enabled).
 
     Returns:
-        Ranked list of ScoredChunk (RRF order, or rerank order if enabled).
+        Ranked list of up to top_k ScoredChunk (RRF order, or rerank order if
+        enabled). Reranking reorders the full top_k candidate set rather than
+        truncating it, so rank metrics (recall@k, nDCG@k) stay comparable across
+        variants — a rerank cutoff below k would otherwise cap those metrics.
     """
     if variant.use_rewrite:
         rewrite = await rewrite_query(question)
@@ -120,28 +121,39 @@ async def run_variant(
         queries = [question]
         filters = dict(dataset_filters) if variant.use_filters else {}
 
-    filter_json = json.dumps([filters]) if filters else None
-
     client = AsyncOpenAI()
     response = await client.embeddings.create(model=EMBEDDING_MODEL, input=queries)
     embeddings = [item.embedding for item in response.data]
 
     branch_limit = max(top_k * BRANCH_LIMIT_MULTIPLIER, top_k)
-    chunk_map: dict[str, ScoredChunk] = {}
-    ranked_lists: list[list[str]] = []
 
-    async with db_pool.acquire() as conn:
-        for query, embedding in zip(queries, embeddings):
-            if variant.use_semantic:
-                rows = await _search_semantic(conn, embedding, filter_json, branch_limit)
-                ranked_lists.append(_collect(rows, chunk_map))
-            if variant.use_bm25:
-                rows = await _search_bm25(conn, query, embedding, filter_json, branch_limit)
-                ranked_lists.append(_collect(rows, chunk_map))
+    async def _fuse(fj: str | None) -> list[ScoredChunk]:
+        """Run the enabled branches under filter `fj` and fuse via RRF."""
+        chunk_map: dict[str, ScoredChunk] = {}
+        ranked_lists: list[list[str]] = []
+        async with db_pool.acquire() as conn:
+            for query, embedding in zip(queries, embeddings):
+                if variant.use_semantic:
+                    rows = await _search_semantic(conn, embedding, fj, branch_limit)
+                    ranked_lists.append(_collect(rows, chunk_map))
+                if variant.use_bm25:
+                    rows = await _search_bm25(conn, query, embedding, fj, branch_limit)
+                    ranked_lists.append(_collect(rows, chunk_map))
+        return _rrf_fuse(ranked_lists, chunk_map, top_k)
 
-    fused = _rrf_fuse(ranked_lists, chunk_map, top_k)
+    filter_json = json.dumps([filters]) if filters else None
+    fused = await _fuse(filter_json)
 
-    if variant.use_rerank:
-        fused, _ = await rerank(question, fused, top_n=top_n)
+    # Mirror hybrid_retrieve's zero-result fallback: if a filter (e.g. an
+    # LLM-hallucinated ticker) matches nothing, retry unfiltered so the variant
+    # reflects production behavior rather than scoring a hard zero.
+    if not fused and filter_json is not None:
+        fused = await _fuse(None)
+
+    if variant.use_rerank and fused:
+        # Rerank the entire fused set (top_n = len) so the returned list is the
+        # full top_k reordered, not truncated to a production top_n. This keeps
+        # recall@k / nDCG@k comparable with the non-rerank variants.
+        fused, _ = await rerank(question, fused, top_n=len(fused))
 
     return fused

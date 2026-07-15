@@ -87,10 +87,18 @@ def extract_filing_metadata(doc: Document) -> dict:
     if form_match:
         result["form_type"] = _normalize_form_type(form_match.group(1))
 
-    # Prefer explicit fiscal-year phrasing; fall back to filename year, then any
-    # plausible year in the content head.
-    fy_match = _FY_PHRASE_RE.search(head)
-    year_match = fy_match or _YEAR_RE.search(filename) or _YEAR_RE.search(head)
+    # Prefer the filename year: each PDF page is ingested as its own Document, so
+    # an in-content "fiscal year" phrase is per-page and unreliable — MD&A pages
+    # routinely reference prior years in comparisons (e.g. "grew from fiscal year
+    # 2023 levels"), which would mislabel that page with the wrong filing year.
+    # The filename year is stable across every page of the same filing. Fall back
+    # to the explicit phrase, then any plausible year in the content, only when
+    # the filename itself carries no year.
+    year_match = (
+        _YEAR_RE.search(filename)
+        or _FY_PHRASE_RE.search(head)
+        or _YEAR_RE.search(head)
+    )
     if year_match:
         result["fiscal_year"] = int(year_match.group(1))
 

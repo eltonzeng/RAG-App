@@ -58,9 +58,11 @@ filters), plus three cross-filing `theme*` questions whose `gold` spans multiple
 filings — these exercise the metrics' credit-once rule against real multi-source
 gold.
 
-**The `source_filename` values are real** (they match the PDFs in `filings/`), but
-every `page_number` is still `0` — a "needs labeling" sentinel. Ingest the six
-filings, then replace each `page_number` with the page that actually answers the
-question (open the PDF and read; see the labeling guide above). The numbers are
-meaningless until the pages are labeled. Add more rows freely; 30–50 well-labeled
-questions is a solid benchmark.
+All 27 rows are labeled with real page numbers, verified by reading each filing's
+extracted page text directly (not guessed). `theme2`'s gold set is COHR/AAOI/MU —
+not OUST, which carries no customer-concentration disclosure in this filing.
+`sndk2`'s wording was adjusted from the original "BiCS" framing: that branding
+appears only in an exhibit title in this filing, not in the substantive NAND
+technology narrative, so the question was reworded to match what the filing
+actually discusses. Add more rows freely; 30–50 well-labeled questions is a
+solid benchmark.

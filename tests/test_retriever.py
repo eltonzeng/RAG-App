@@ -178,6 +178,93 @@ class TestRowConversion:
         assert sc.chunk.metadata["page_number"] is None
 
 
+class _FakeAcquire:
+    """Async context manager mimicking asyncpg pool.acquire()."""
+
+    def __init__(self, conn) -> None:
+        self._conn = conn
+
+    async def __aenter__(self):
+        return self._conn
+
+    async def __aexit__(self, *exc) -> bool:
+        return False
+
+
+class _FakePool:
+    """Minimal asyncpg.Pool stand-in that hands out a fixed connection."""
+
+    def __init__(self, conn) -> None:
+        self._conn = conn
+
+    def acquire(self) -> _FakeAcquire:
+        return _FakeAcquire(self._conn)
+
+
+def _patch_embeddings():
+    """Patch AsyncOpenAI in the retriever to return one dummy embedding."""
+    mock_client = MagicMock()
+    emb_resp = MagicMock()
+    emb_resp.data = [MagicMock(embedding=[0.1, 0.2, 0.3])]
+    mock_client.embeddings.create = AsyncMock(return_value=emb_resp)
+    patcher = patch("retrieval.retriever.AsyncOpenAI", return_value=mock_client)
+    return patcher
+
+
+class TestHybridRetrieveFallback:
+    """The zero-result fallback: a filter matching nothing retries unfiltered."""
+
+    @pytest.mark.asyncio
+    async def test_bad_filter_falls_back_to_unfiltered(self) -> None:
+        from retrieval import retriever
+
+        row = _row("c1", 0.8, [{"source_filename": "aaoi.pdf", "page_number": 5}])
+
+        # Filtered branches match nothing (e.g. hallucinated ticker); unfiltered
+        # find the chunk.
+        async def fake_semantic(conn, embedding, fj, limit):
+            return [] if fj is not None else [row]
+
+        async def fake_bm25(conn, query, embedding, fj, limit):
+            return []
+
+        pool = _FakePool(AsyncMock())
+        with _patch_embeddings(), \
+                patch.object(retriever, "_search_semantic", side_effect=fake_semantic), \
+                patch.object(retriever, "_search_bm25", side_effect=fake_bm25):
+            result = await retriever.hybrid_retrieve(
+                ["q"], {"ticker": "AOEO"}, pool, top_k=10
+            )
+
+        assert [sc.chunk.id for sc in result] == ["c1"]
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_when_filter_matches(self) -> None:
+        from retrieval import retriever
+
+        row = _row("c1", 0.8, [{"source_filename": "mu.pdf", "page_number": 5}])
+        seen_fj: list = []
+
+        async def fake_semantic(conn, embedding, fj, limit):
+            seen_fj.append(fj)
+            return [row]
+
+        async def fake_bm25(conn, query, embedding, fj, limit):
+            return []
+
+        pool = _FakePool(AsyncMock())
+        with _patch_embeddings(), \
+                patch.object(retriever, "_search_semantic", side_effect=fake_semantic), \
+                patch.object(retriever, "_search_bm25", side_effect=fake_bm25):
+            result = await retriever.hybrid_retrieve(
+                ["q"], {"ticker": "MU"}, pool, top_k=10
+            )
+
+        assert [sc.chunk.id for sc in result] == ["c1"]
+        # The filter matched, so retrieval never retried unfiltered.
+        assert all(fj is not None for fj in seen_fj)
+
+
 class TestRRFFusion:
     """Tests for _rrf_fuse."""
 
