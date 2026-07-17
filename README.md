@@ -132,26 +132,50 @@ LLM judge (a different, stronger model than the generator, to avoid self-consist
 bias) on faithfulness, citation accuracy, and answer relevance, plus a groundedness
 pass-rate. Per-question judge **rationales** are persisted for inspection.
 
-Results below are from the official run (`claude-sonnet-5` generation, `claude-opus-4-8`
-judge, production Cohere key):
+Results below are from the **official run** — 2026-07-17, commit
+[`93f302d`](https://github.com/eltonzeng/RAG-App/commit/93f302d), `claude-sonnet-5`
+generation, `claude-opus-4-8` judge, production Cohere key. Full per-question reports
+(rationales, scores, run config) are committed at
+[`evals/reports/official/`](evals/reports/official/); both runs recorded **zero**
+`rerank_fallback` caveats, confirming the production key never throttled.
 
-**Retrieval ablation** — _pending official run_
+**Retrieval ablation** (n=27 gold questions)
 
 | variant | recall@5 | recall@10 | nDCG@10 | MRR | hit_rate@10 |
 |---|---|---|---|---|---|
-| semantic_only | _—_ | _—_ | _—_ | _—_ | _—_ |
-| bm25_only | _—_ | _—_ | _—_ | _—_ | _—_ |
-| hybrid | _—_ | _—_ | _—_ | _—_ | _—_ |
-| hybrid_filters | _—_ | _—_ | _—_ | _—_ | _—_ |
-| hybrid_multiquery | _—_ | _—_ | _—_ | _—_ | _—_ |
-| hybrid_multiquery_rerank | _—_ | _—_ | _—_ | _—_ | _—_ |
+| semantic_only | 0.173 | 0.210 | 0.154 | 0.163 | 0.259 |
+| bm25_only | 0.506 | 0.580 | 0.383 | 0.337 | 0.593 |
+| hybrid | 0.296 | 0.531 | 0.276 | 0.216 | 0.593 |
+| hybrid_filters | **0.593** | **0.778** | **0.466** | **0.374** | **0.815** |
+| hybrid_multiquery | 0.444 | 0.691 | 0.427 | 0.357 | 0.741 |
+| hybrid_multiquery_rerank | **0.617** | 0.704 | 0.439 | 0.366 | 0.741 |
 
-**Generation (LLM-as-judge, 1–5)** — _pending official run_
+**Generation (LLM-as-judge, 1–5)** (n=27)
 
 | faithfulness | citation_accuracy | answer_relevance | groundedness_rate |
 |---|---|---|---|
-| _—_ | _—_ | _—_ | _—_ |
+| 4.963 | 4.926 | 4.778 | 0.963 |
 
+> **⚠️ n=27 — read deltas, not absolutes.** One question moves any recall/hit-rate
+> point by ~3.7pts, and the 95% CI on a proportion at this sample size is roughly
+> ±18pts. Treat gaps under ~7pts (e.g. `hybrid` vs `bm25_only` recall@10, 0.531 vs
+> 0.580) as noise, not a real regression.
+>
+> **What the ablation actually shows:** metadata filters are the single biggest
+> lever (+0.25 recall@10 over hybrid) — narrowing to the right filing matters more
+> than any ranking trick on this corpus. BM25 alone comfortably beats semantic alone
+> (SEC queries are exact-term-heavy: tickers, GAAP line items, that dense embeddings
+> blur). Plain RRF fusion (`hybrid`) doesn't clearly beat `bm25_only` — within the
+> n=27 noise band, at best comparable — but reranking recovers the best recall@5 of
+> any variant (0.617), showing fusion's value shows up in top-of-list precision
+> rather than raw recall.
+>
+> **On the judge:** the single non-grounded generation question is a positive
+> signal, not a defect — the judge flagged a cross-company synthesis answer for
+> overgeneralizing a claim that only one of the cited filings actually supported
+> (see the full rationale in the committed report). That's the independent-judge
+> design catching a real, subtle overreach, not rubber-stamping.
+>
 > Judge scores are directional (they compare configs and catch regressions), not a
 > certified accuracy number. Reports auto-flag score-distorting artifacts (e.g. Cohere
 > trial-key rate-limiting) as `caveats`.

@@ -16,8 +16,10 @@ htmlcov/
 # Secrets & env
 .env
 
-# Eval outputs (generated per run)
-evals/reports/
+# Eval outputs (generated per run) — except the committed official benchmark
+evals/reports/*
+!evals/reports/official/
+!evals/reports/official/*.json
 
 # Ingested filings (large binaries — fetch from EDGAR, don't commit)
 filings/

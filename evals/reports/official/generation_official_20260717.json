@@ -1,0 +1,327 @@
+{
+  "suite": "generation",
+  "generated_at": "20260717T222704Z",
+  "git_commit": "93f302d",
+  "models": {
+    "embedding_model": "text-embedding-3-small",
+    "query_rewrite_model": "claude-haiku-4-5-20251001",
+    "rerank_model": "rerank-english-v3.0",
+    "generation_model": "claude-sonnet-5",
+    "judge_model": "claude-opus-4-8"
+  },
+  "run_config": {
+    "limit": null,
+    "concurrency": 2,
+    "pace": 2.0
+  },
+  "caveats": [],
+  "aggregates": {
+    "generation": {
+      "faithfulness": 4.962962962962963,
+      "citation_accuracy": 4.925925925925926,
+      "answer_relevance": 4.777777777777778,
+      "groundedness_rate": 0.9629629629629629,
+      "judge_error_rate": 0.0,
+      "n": 27.0
+    }
+  },
+  "rows": [
+    {
+      "id": "cohr1",
+      "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The context (Excerpts 1 and 3) discusses segment reporting methodology and metrics but contains no actual per-segment revenue figures for fiscal 2025, so the answer correctly declines to answer. This graceful \"I don't have enough information\" response is faithful and directly addresses the question, and the referenced pages match the methodology discussion.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "cohr2",
+      "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim maps cleanly to the excerpts: AI/ML growth and protocol-agnostic vertical integration (Excerpt 1), fabs, silicon photonics, and CPO (Excerpt 3), R&D in 800G/1.6T, OCS for AI/ML datacenters (Excerpt 2), and ZR/ZR+ demand (Excerpt 5). Citations correctly identify source pages and directly address how Coherent benefits from AI datacenter transceiver demand.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "cohr3",
+      "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported by Excerpts 1 and 3 (page 14): the unique vertical integration and internal design/manufacture of transceivers and components, InP-based DMLs/EMLs/CW lasers, multiple InP fabs moving to 6-inch, silicon photonics/CPO, and the protocol-agnostic AI/ML transceivers. Citations to page 14 accurately point to the supporting excerpts, and the answer fully addresses the question about InP and vertical integration for datacom.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "cohr4",
+      "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 4,
+      "grounded": true,
+      "rationale": "Every claim is supported: the $4.0B credit facility, Term A $850M/July 2027 and Term B/July 2029 (Excerpt 3), SOFR+1.85% and amendments (Excerpts 1, 2, 4), the $18M German loan at 1.55% due 2030 and $990M 5.000% Senior Notes (Excerpt 5), and covenant compliance (Excerpt 5). Citations correctly map to those pages. The answer honestly notes it cannot provide the total balance since the debt table figures were not in the excerpts, which slightly limits relevance to the question's request for a total balance.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "aaoi1",
+      "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The AAOI excerpts (2-5) contain no customer-concentration data, so the answer correctly declines to answer. It also faithfully notes that the 10%-customer disclosure belongs to Coherent (Excerpt 1), avoiding the trap of misattributing it to AAOI, and cites correctly.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "aaoi2",
+      "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "All claims are directly supported by AAOI excerpts 2 and 5: the AI-driven interconnect demand, the specific 800G role in AI compute infrastructure, the 82.8% revenue growth, and the forward outlook with the noted cut-off text. Citations correctly point to AAOI pages 51 and 49, and the answer appropriately confines itself to AAOI rather than pulling in the irrelevant COHR excerpts. The answer fully addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "aaoi3",
+      "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 1,
+      "grounded": true,
+      "rationale": "The answer declined to respond, but the context contains no excerpts about Applied Optoelectronics (excerpts are from Ouster/OUST and ServiceTitan/SERV). Since none of the provided excerpts pertain to Applied Optoelectronics, the \"not enough information\" response is faithful and makes no unsupported claims, but it fails to be relevant to answering whether that specific company raises going-concern doubt.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "aaoi4",
+      "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+      "faithfulness": 5,
+      "citation_accuracy": 4,
+      "answer_relevance": 4,
+      "grounded": true,
+      "rationale": "All claims are supported by Excerpt 1 (vertically integrated fiber-optic provider; lasers and laser components as building blocks), and the answer correctly acknowledges the excerpts lack detailed end-market breakdown for AOI. The inline citations to page 5 are accurate, though the appended citation list includes irrelevant sources (COHR excerpts and AAOI financial statement pages) that don't support any AOI claim. The answer addresses the question honestly given the limited context, correctly noting end markets aren't specified.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "mu1",
+      "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: HBM architecture and AI-ideal framing (Excerpt 1), supply shift and profitability (Excerpt 2), CMBU +257% AI demand (Excerpt 3), $13.52B/$3.79B/$1.87B revenue figures (Excerpt 4), and HBM3E/HBM4 product details plus memory-centric demand (Excerpt 5). Citations map accurately to each supporting excerpt, though CMBU is Micron's \"Cloud Memory Business Unit\" \u2014 the answer's expansion is consistent with the excerpts. The response is complete and directly on-topic.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "mu2",
+      "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The core figures (DRAM +62% on low-40% ASP and mid-teen bit shipment increases; NAND +18% on high-teen bit shipments) are directly supported by Excerpt 3, page 76. Supporting details on gross margin (Excerpt 4), NAND margin/cost reductions (Excerpt 1, page 75), and the AI-driven DRAM supply shift to data center/HBM (Excerpt 1, page 75) are all accurately cited, and the answer fully addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "mu3",
+      "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: Idaho/New York/Virginia fab funding and CHIPS conditions (Excerpt 3), 35% tax credit and $5.5B NY four-fab term sheet (Excerpts 2/4), Boise groundbreaking and 2027 DRAM output plus second Idaho fab (Excerpt 5), India Gujarat facility (Excerpts 2/4), and HBM packaging (Excerpt 4). Citations map accurately to the correct pages. The answer appropriately notes specific capex dollar figures beyond the $5.5B NY term sheet are not detailed and stays fully on topic.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "mu4",
+      "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is supported: 1\u03b3 EUV DRAM node and HBM4 schedule from Excerpt 1, G9 NAND volume production and G8/G9 bit production plus TLC/QLC from Excerpt 3, and technology node cadence management from Excerpt 5. Citations point to the correct pages, and the answer directly addresses the DRAM/NAND transitions asked.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "sndk1",
+      "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: separation date/standalone status (Excerpt 2), historical statements caveat and cash management via Net investment from WDC (Excerpt 1), the $112M tax indemnity reduced by ~$2M (Excerpt 3), and asset/liability transfers plus the agreements (Excerpts 4-5). Citations correctly map to the supporting pages, and the answer directly addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "sndk2",
+      "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: the successive-generations and R&D statements come from Excerpt 3 (page 8), and the AI/innovation-pressure quote matches Excerpt 5 (page 22), all cited correctly. The answer appropriately acknowledges the excerpts lack specific roadmap details (layer counts, node names), which is a faithful and relevant response to the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "sndk3",
+      "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "All figures match the tables in Excerpts 3 and 4, the Cloud growth commentary matches Excerpt 2, and the end-market descriptions match Excerpts 1/2/5. The percentage shares (~56%, ~31%, ~13%) are correct arithmetic derivations from the cited totals, and citations point to the right pages.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "sndk4",
+      "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: supplier concentration and single-source risks (Excerpt 1), pandemic/operational disruption to Flash Ventures (Excerpt 2), strategic partnership risks with Kioxia/Flash Ventures (Excerpts 4-5), and the fixed/variable cost and capital funding commitments with price tied to future wafer cost (Excerpt 3). Citations match the supporting excerpts, and the answer appropriately notes that dedicated NAND pricing risk factors are absent from the provided context rather than fabricating them.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "oust1",
+      "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is supported: digital lidar founding and 3D vision (Excerpt 1), short/mid/long-range solid-state sensors, Gemini and BlueCity (Excerpt 2), unified platform components and eye-safe lasers plus field-upgradeable software (Excerpt 3), and OS series/Gemini components (Excerpt 5). Citations correctly map to the excerpts, and the answer comprehensively addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "oust2",
+      "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The excerpts only contain financial statement titles and headers (Excerpts 1-5) with no actual figures for revenue, net loss, or cash. The answer correctly declines to answer and accurately describes what the excerpts contain, citing the correct pages.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "oust3",
+      "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The answer correctly lists all four target markets (automotive, industrial, robotics, smart infrastructure) supported by Excerpts 1, 2, 4, and 5. The automotive and robotics descriptions match Excerpt 3, and the quoted TAM definition matches Excerpt 5. All claims are grounded and citations point to the supporting excerpts.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "oust4",
+      "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is directly supported: merger dates and structure (Excerpt 5), OS/Velodyne/DF sensor offerings and DF development synergy (Excerpt 1), acquired product lines and end-of-life/manufacturing cessation (Excerpts 3, 5), and the litigation details including that Ouster/Velodyne were not named defendants (Excerpt 4). Citations correctly map to the excerpts containing the claims, and the answer thoroughly addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "serv1",
+      "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is supported: fleet size of over 2,000 robots (Excerpts 1, 2), growth/global leader plan and partner-driven expansion (Excerpt 2), expansion into indoor/outdoor use cases (Excerpts 1, 3), daily depot cycle and third-gen robots (Excerpt 5). Citations correctly map to supporting excerpts, and the answer fully addresses both the fleet count and deployment plan.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "serv2",
+      "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is supported: platform integration with Uber Eats/DoorDash (Excerpt 2, p6), commercial agreements and ~2,000 robots (Excerpt 3, p12), and the three fleet-services revenue streams (Excerpt 4, p118). The answer correctly notes Uber Eats is grouped with DoorDash and appropriately flags that no Uber Eats-specific revenue figures are disclosed, avoiding unsupported inference while fully addressing the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "serv3",
+      "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The context excerpts (1-5) contain only headers, audit opinions, and segment/marketable-securities notes without the actual net loss figures, cash balances, or going concern language, so the answer correctly declines to fabricate them. Its characterization of each excerpt is accurate (e.g., net loss as performance metric on page 145, statement header on page 96), and it directly and appropriately addresses the question by noting the missing data.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "serv4",
+      "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "The three revenue streams (delivery, branding, data monetization) are fully supported by Excerpt 1, with the OOH branding detail from Excerpt 5 and delivery partners (Uber Eats, DoorDash) from Excerpt 4. The growth plans cite Excerpt 5 accurately. All citations point to excerpts that contain the claimed content, and the answer directly and completely addresses the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "theme1",
+      "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every quote is verbatim from the excerpts and correctly cited (Excerpt 1 p.34, Excerpts 2/5 p.75, Excerpt 3 p.14, Excerpt 4 p.12). The answer correctly identifies Micron as the only represented company and appropriately notes no other companies appear in the context, fully addressing the question.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "theme2",
+      "question": "How do these hardware companies describe customer concentration risk?",
+      "faithfulness": 4,
+      "citation_accuracy": 4,
+      "answer_relevance": 5,
+      "grounded": false,
+      "rationale": "Most claims are well-supported: SNDK figures (Excerpt 1), AAOI revenue/receivables concentration (Excerpt 2), and Micron's credit-risk framing and no-material-losses statement (Excerpt 4). However, the \"Common Themes\" claim that \"all companies acknowledge that loss of a major customer could materially harm revenue\" is only supported for SERV (Excerpts 3, 5) \u2014 which the answer explicitly excludes \u2014 and not for SNDK, AAOI, or MU in the provided excerpts, making that a slight overreach. The SERV citations are listed but the answer notably does not use them substantively, so citation accuracy is otherwise good.",
+      "error": false,
+      "rerank_fallback": false
+    },
+    {
+      "id": "theme3",
+      "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+      "faithfulness": 5,
+      "citation_accuracy": 5,
+      "answer_relevance": 5,
+      "grounded": true,
+      "rationale": "Every claim is grounded: SERV's ERM integration and risk categories (Excerpt 1), SNDK's ERM process and management-to-Board reporting (Excerpt 2), COHR/MU's NIST-CSF alignment and routine assessments (Excerpts 3-4), and AAOI's Board/management oversight (Excerpt 5). The answer correctly notes where framework alignment or Board oversight is \"not specified\" in the excerpts rather than inferring, and citations map accurately to sources. The one inference labeling \"ServiceNow\" as SERV is a reasonable identification and the table caveats are appropriately hedged.",
+      "error": false,
+      "rerank_fallback": false
+    }
+  ]
+}
