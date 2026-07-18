@@ -1,0 +1,1533 @@
+{
+  "suite": "retrieval",
+  "generated_at": "20260718T000457Z",
+  "git_commit": "668469a",
+  "models": {
+    "embedding_model": "text-embedding-3-small",
+    "query_rewrite_model": "claude-haiku-4-5-20251001",
+    "rerank_model": "rerank-english-v3.0",
+    "generation_model": "claude-sonnet-4-6",
+    "judge_model": "claude-sonnet-5"
+  },
+  "run_config": {
+    "limit": null,
+    "variants": null
+  },
+  "caveats": [],
+  "aggregates": {
+    "semantic_only": {
+      "recall@5": 0.5308641975308642,
+      "recall@10": 0.6666666666666666,
+      "ndcg@10": 0.4293407103579329,
+      "mrr": 0.3746743996743996,
+      "hit_rate@10": 0.7037037037037037
+    },
+    "bm25_only": {
+      "recall@5": 0.5061728395061729,
+      "recall@10": 0.5802469135802469,
+      "ndcg@10": 0.3830820952624443,
+      "mrr": 0.3367648108876179,
+      "hit_rate@10": 0.5925925925925926
+    },
+    "hybrid": {
+      "recall@5": 0.46913580246913583,
+      "recall@10": 0.6913580246913581,
+      "ndcg@10": 0.4217432985142647,
+      "mrr": 0.34625220458553796,
+      "hit_rate@10": 0.7037037037037037
+    },
+    "hybrid_filters": {
+      "recall@5": 0.5802469135802469,
+      "recall@10": 0.7654320987654322,
+      "ndcg@10": 0.4593807332922192,
+      "mrr": 0.3691156904607197,
+      "hit_rate@10": 0.7777777777777778
+    },
+    "hybrid_multiquery": {
+      "recall@5": 0.4320987654320988,
+      "recall@10": 0.7037037037037038,
+      "ndcg@10": 0.4379771398947627,
+      "mrr": 0.3722505526427095,
+      "hit_rate@10": 0.7407407407407407
+    },
+    "hybrid_multiquery_rerank": {
+      "recall@5": 0.617283950617284,
+      "recall@10": 0.7777777777777778,
+      "ndcg@10": 0.4626919040874737,
+      "mrr": 0.3783215755437977,
+      "hit_rate@10": 0.8148148148148148
+    }
+  },
+  "rows": {
+    "semantic_only": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07692307692307693,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.3333333333333333,
+        "ndcg@10": 0.46927872602275644,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.3501483019834802,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.6666666666666666,
+        "recall@10": 1.0,
+        "ndcg@10": 0.55744812840856,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      }
+    ],
+    "bm25_only": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07692307692307693,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.05263157894736842,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.3379680345449381,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 1.0,
+        "ndcg@10": 0.7928654229965442,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      }
+    ],
+    "hybrid": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.05,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.4632423659320675,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.06666666666666667,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5065745439910657,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      }
+    ],
+    "hybrid_filters": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3010299956639812,
+        "mrr": 0.1111111111111111,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.05263157894736842,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.4632423659320675,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.06666666666666667,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5065745439910657,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      }
+    ],
+    "hybrid_multiquery": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.2890648263178879,
+        "mrr": 0.1,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07692307692307693,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07692307692307693,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3562071871080222,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.2890648263178879,
+        "mrr": 0.1,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.058823529411764705,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.36926780146674987,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.0,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.3084274278260313,
+        "mrr": 0.16666666666666666,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.4525081529734507,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      }
+    ],
+    "hybrid_multiquery_rerank": [
+      {
+        "id": "cohr1",
+        "question": "How much revenue did Coherent generate from each of its reportable segments in fiscal 2025?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr2",
+        "question": "How is Coherent positioned to benefit from AI datacenter demand for optical transceivers?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr3",
+        "question": "What indium phosphide and vertical integration capabilities does Coherent describe for its datacom products?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "cohr4",
+        "question": "What are the terms and total balance of Coherent's outstanding long-term debt?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi1",
+        "question": "What portion of Applied Optoelectronics' revenue came from its largest customers?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3010299956639812,
+        "mrr": 0.1111111111111111,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi2",
+        "question": "What does Applied Optoelectronics disclose about its 800G datacenter transceiver products and AI-driven demand?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "aaoi3",
+        "question": "Does Applied Optoelectronics raise substantial doubt about its ability to continue as a going concern, and what are its liquidity plans?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "aaoi4",
+        "question": "What are Applied Optoelectronics' primary end markets and product lines?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.0,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "mu1",
+        "question": "What does Micron disclose about high-bandwidth memory (HBM) revenue and demand from AI applications?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu2",
+        "question": "How did Micron's DRAM and NAND revenue each grow in fiscal 2025?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu3",
+        "question": "What are Micron's planned capital expenditures and fabrication facility investments?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.3333333333333333,
+        "mrr": 0.14285714285714285,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "mu4",
+        "question": "Which DRAM and NAND technology node transitions is Micron ramping?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk1",
+        "question": "How did Sandisk's separation from Western Digital affect its financial statements and capital structure?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "sndk2",
+        "question": "What does Sandisk say about its 3D NAND flash technology roadmap and generational improvements?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk3",
+        "question": "What are Sandisk's revenue contributions by end market such as cloud, client, and consumer?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.38685280723454163,
+        "mrr": 0.2,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "sndk4",
+        "question": "What risk factors does Sandisk identify related to NAND flash pricing and supply?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust1",
+        "question": "What lidar products and sensor lines does Ouster describe, including its digital lidar platform?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.43067655807339306,
+        "mrr": 0.25,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust2",
+        "question": "What were Ouster's revenue and net loss for the year, and does it have sufficient cash on hand?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.06666666666666667,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "oust3",
+        "question": "What target markets does Ouster serve for its lidar sensors, such as automotive, industrial, and robotics?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.5,
+        "mrr": 0.3333333333333333,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "oust4",
+        "question": "How did the acquisition of Velodyne affect Ouster's business and product portfolio?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv1",
+        "question": "How many delivery robots does Serve Robotics operate and what is its fleet deployment plan?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 1.0,
+        "mrr": 1.0,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv2",
+        "question": "What partnership does Serve Robotics have with Uber Eats and how does it drive revenue?",
+        "recall@5": 1.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6309297535714575,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv3",
+        "question": "What were Serve Robotics' net loss and cash position, and does it disclose going concern risk?",
+        "recall@5": 0.0,
+        "recall@10": 1.0,
+        "ndcg@10": 0.31546487678572877,
+        "mrr": 0.125,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "serv4",
+        "question": "How does Serve Robotics generate revenue from its autonomous sidewalk delivery robots?",
+        "recall@5": 0.0,
+        "recall@10": 0.0,
+        "ndcg@10": 0.0,
+        "mrr": 0.07142857142857142,
+        "hit_rate@10": 0.0
+      },
+      {
+        "id": "theme1",
+        "question": "Which companies cite AI-driven demand as a key growth driver for their products?",
+        "recall@5": 0.6666666666666666,
+        "recall@10": 0.6666666666666666,
+        "ndcg@10": 0.5307212739772434,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme2",
+        "question": "How do these hardware companies describe customer concentration risk?",
+        "recall@5": 0.3333333333333333,
+        "recall@10": 0.3333333333333333,
+        "ndcg@10": 0.2960819109658652,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      },
+      {
+        "id": "theme3",
+        "question": "What cybersecurity risk management and governance processes do the filings describe under Item 1C?",
+        "recall@5": 0.6666666666666666,
+        "recall@10": 1.0,
+        "ndcg@10": 0.6546154994739983,
+        "mrr": 0.5,
+        "hit_rate@10": 1.0
+      }
+    ]
+  }
+}

@@ -22,10 +22,19 @@ CREATE TABLE IF NOT EXISTS chunks (
     ingested_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Semantic search: cosine-distance IVFFlat index (appropriate for < 1M vectors).
+-- Semantic search: cosine-distance HNSW index. Replaced IVFFlat after the eval
+-- harness caught it zeroing dense recall: with lists=100 on a few thousand rows
+-- and the default probes=1, each query scanned <1% of vectors and hit_rate@10
+-- measured 0.259 vs 0.704 for exact search. HNSW's graph search has no cluster
+-- blind spot and needs no probes tuning.
 CREATE INDEX IF NOT EXISTS idx_chunks_embedding
-    ON chunks USING ivfflat (embedding vector_cosine_ops)
-    WITH (lists = 100);
+    ON chunks USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 64);
+
+-- HNSW returns at most ef_search candidates per scan (default 40) — raise it
+-- above the retriever's branch limit (top_k * 2 = 40) so results are never
+-- silently truncated.
+ALTER DATABASE ragdb SET hnsw.ef_search = 100;
 
 -- Lexical search: ParadeDB BM25 index over content, keyed by the primary key.
 CREATE INDEX IF NOT EXISTS idx_chunks_bm25

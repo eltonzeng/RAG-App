@@ -34,7 +34,7 @@ as first-class deliverables alongside functionality.
   metadata.py (ticker/year/form)                           │
   chunker.py (fixed/recursive/sentence)                    │
   embedder.py                             retriever.py  — hybrid, per variant:
-   └─ OpenAI batch embed                    ├─ semantic: pgvector cosine (IVFFlat)
+   └─ OpenAI batch embed                    ├─ semantic: pgvector cosine (HNSW)
    └─ content-hash dedup                    ├─ lexical:  ParadeDB pg_search BM25
    └─ pgvector upsert                       └─ Reciprocal Rank Fusion (RRF)
           │                                    │  (zero-result → unfiltered retry)
@@ -139,16 +139,52 @@ generation, `claude-opus-4-8` judge, production Cohere key. Full per-question re
 [`evals/reports/official/`](evals/reports/official/); both runs recorded **zero**
 `rerank_fallback` caveats, confirming the production key never throttled.
 
-**Retrieval ablation** (n=27 gold questions)
+**Retrieval ablation** (n=27 gold questions) — as first run at v1.0.0, on the
+original IVFFlat index:
 
 | variant | recall@5 | recall@10 | nDCG@10 | MRR | hit_rate@10 |
 |---|---|---|---|---|---|
 | semantic_only | 0.173 | 0.210 | 0.154 | 0.163 | 0.259 |
 | bm25_only | 0.506 | 0.580 | 0.383 | 0.337 | 0.593 |
 | hybrid | 0.296 | 0.531 | 0.276 | 0.216 | 0.593 |
-| hybrid_filters | **0.593** | **0.778** | **0.466** | **0.374** | **0.815** |
+| hybrid_filters | 0.593 | 0.778 | 0.466 | 0.374 | 0.815 |
 | hybrid_multiquery | 0.444 | 0.691 | 0.427 | 0.357 | 0.741 |
-| hybrid_multiquery_rerank | **0.617** | 0.704 | 0.439 | 0.366 | 0.741 |
+| hybrid_multiquery_rerank | 0.617 | 0.704 | 0.439 | 0.366 | 0.741 |
+
+### The harness caught a bug: a dead dense path
+
+The v1.0.0 table has an anomaly a healthy system shouldn't show: `semantic_only`
+recall@10 of 0.210 — **20 of 27 questions retrieved zero gold pages** — and plain
+`hybrid` *below* `bm25_only`, because RRF was fusing a strong lexical ranking with
+near-noise. Root cause, confirmed by re-running one dead query three ways (default
+index / exhaustive probes / sequential scan): the IVFFlat index was configured with
+`lists=100` on only ~3.7K vectors and pgvector's default `probes=1`, so each query
+scanned **under 1% of the corpus** — gold chunks in any other cluster were never
+examined. Measuring the ceiling with exact search put true dense capability at
+**hit_rate@10 = 0.704 vs the indexed 0.259**: the embeddings were fine; the index
+was throwing their signal away.
+
+The fix: swap IVFFlat for **HNSW** (`m=16, ef_construction=64`, `ef_search=100` —
+graph search has no cluster blind spot and needs no probes tuning). Re-run of the
+same suite, same gold set, same models
+([full report](evals/reports/official/retrieval_official_20260717_hnsw.json)):
+
+| variant | recall@5 | recall@10 | nDCG@10 | MRR | hit_rate@10 |
+|---|---|---|---|---|---|
+| semantic_only | 0.531 ▲ | 0.667 ▲ | 0.429 ▲ | 0.375 ▲ | 0.704 ▲ |
+| bm25_only | 0.506 | 0.580 | 0.383 | 0.337 | 0.593 |
+| hybrid | 0.469 ▲ | 0.691 ▲ | 0.422 ▲ | 0.346 ▲ | 0.704 ▲ |
+| hybrid_filters | 0.580 | 0.765 | 0.459 | 0.369 | 0.778 |
+| hybrid_multiquery | 0.432 | 0.704 | 0.438 | 0.372 | 0.741 |
+| hybrid_multiquery_rerank | **0.617** | **0.778** | **0.463** | **0.378** | **0.815** |
+
+Post-fix, the ablation shows the shape hybrid search is supposed to have:
+`semantic_only` hit_rate@10 lands exactly on the measured 0.704 exact-search
+ceiling (HNSW is effectively lossless here); `hybrid` now beats `bm25_only` on
+recall@10 (+0.11); and the full pipeline (`hybrid_multiquery_rerank`) is best or
+tied-best on every metric. The honest residual: 8 questions stay dense-hard even
+under exact search — exact-number and table lookups where embeddings blur — which
+is precisely the query class BM25 carries, and the empirical case for hybrid.
 
 **Generation (LLM-as-judge, 1–5)** (n=27)
 
@@ -156,19 +192,15 @@ generation, `claude-opus-4-8` judge, production Cohere key. Full per-question re
 |---|---|---|---|
 | 4.963 | 4.926 | 4.778 | 0.963 |
 
+Generation was scored at v1.0.0 (pre-index-fix); its retrieval feed
+(`hybrid_multiquery_rerank`) improved further with HNSW, so these judge scores are
+if anything a floor. Not re-run — the generation suite is the paid step, and the
+index fix is upstream of an already-near-ceiling result.
+
 > **⚠️ n=27 — read deltas, not absolutes.** One question moves any recall/hit-rate
 > point by ~3.7pts, and the 95% CI on a proportion at this sample size is roughly
-> ±18pts. Treat gaps under ~7pts (e.g. `hybrid` vs `bm25_only` recall@10, 0.531 vs
-> 0.580) as noise, not a real regression.
->
-> **What the ablation actually shows:** metadata filters are the single biggest
-> lever (+0.25 recall@10 over hybrid) — narrowing to the right filing matters more
-> than any ranking trick on this corpus. BM25 alone comfortably beats semantic alone
-> (SEC queries are exact-term-heavy: tickers, GAAP line items, that dense embeddings
-> blur). Plain RRF fusion (`hybrid`) doesn't clearly beat `bm25_only` — within the
-> n=27 noise band, at best comparable — but reranking recovers the best recall@5 of
-> any variant (0.617), showing fusion's value shows up in top-of-list precision
-> rather than raw recall.
+> ±18pts. Small gaps (under ~7pts) are noise; the deltas discussed above — the
+> +0.46 semantic recovery, hybrid's +0.11 over BM25 — are outside that band.
 >
 > **On the judge:** the single non-grounded generation question is a positive
 > signal, not a defect — the judge flagged a cross-company synthesis answer for
